@@ -65,6 +65,8 @@ class LinBusListener : public PollingComponent, public uart::UARTDevice {
 
   // Filled by the UART task (uartEventTask_), drained by the main loop. Copy-only: never blocks.
   SpscRing<DiagFrame, 64> diag_frames_;
+  // LIN messages dropped because the LIN message queue was full. Counted by the UART task, taken by the main loop.
+  std::atomic<uint32_t> lin_msg_dropped_{0};
 
  private:
   uint32_t diag_pid_us_ = 0;

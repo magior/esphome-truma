@@ -61,6 +61,7 @@ enum class QUEUE_LOG_MSG_TYPE {
   WARN_READ_LIN_FRAME_LINv1_CRC,
   WARN_READ_LIN_FRAME_LINv2_CRC,
   VERBOSE_READ_LIN_FRAME_MSG,
+  WARN_READ_LIN_FRAME_MSG_QUEUE_FULL,
 };
 
 // Log messages generated during interrupt are pushed to log queue.

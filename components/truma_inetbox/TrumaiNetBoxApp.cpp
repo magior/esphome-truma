@@ -583,9 +583,9 @@ void TrumaiNetBoxApp::diag_drain_() {
     const auto &lat = this->diag_latency_;
     this->diag_emit_(now, "stats",
                      str_sprintf(",\"n\":%" PRIu32 ",\"min\":%" PRIu32 ",\"p99\":%" PRIu32 ",\"max\":%" PRIu32
-                                 ",\"cs_err\":%" PRIu32 ",\"drop\":%" PRIu32,
+                                 ",\"cs_err\":%" PRIu32 ",\"drop\":%" PRIu32 ",\"lin_drop\":%" PRIu32,
                                  lat.count(), lat.min(), lat.percentile_us(99), lat.max(), this->diag_checksum_errors_,
-                                 this->diag_dropped_));
+                                 this->diag_dropped_, this->lin_msg_dropped_.exchange(0, std::memory_order_relaxed)));
     this->diag_latency_.reset();
     this->diag_checksum_errors_ = 0;
     this->diag_dropped_ = 0;

@@ -358,7 +358,11 @@ void LinBusListener::read_lin_frame_() {
         lin_msg.data[i] = this->current_data_[i];
       }
       if (xQueueSendFromISR(this->lin_msg_queue_, (void *) &lin_msg, nullptr) != pdPASS) {
-        ESP_LOGW(TAG, "LIN message queue full — frame dropped (PID 0x%02X)", this->current_PID_);
+        // No logging on the UART task: count the drop and report it through the log queue.
+        this->lin_msg_dropped_.fetch_add(1, std::memory_order_relaxed);
+        log_msg.type = QUEUE_LOG_MSG_TYPE::WARN_READ_LIN_FRAME_MSG_QUEUE_FULL;
+        log_msg.current_PID = this->current_PID_;
+        TRUMA_LOGW_ISR(log_msg);
       }
     }
     this->diag_push_frame_();
@@ -433,6 +437,9 @@ void LinBusListener::process_log_queue(TickType_t xTicksToWait) {
         break;
       case QUEUE_LOG_MSG_TYPE::WARN_READ_LIN_FRAME_LINv2_CRC:
         ESP_LOGW(TAG, "LIN v2 CRC error");
+        break;
+      case QUEUE_LOG_MSG_TYPE::WARN_READ_LIN_FRAME_MSG_QUEUE_FULL:
+        ESP_LOGW(TAG, "LIN message queue full - frame dropped (PID 0x%02X)", current_PID);
         break;
       case QUEUE_LOG_MSG_TYPE::VERBOSE_READ_LIN_FRAME_MSG:
         // Mark the PID of the TRUMA Combi heater as very verbose message.
