@@ -1,6 +1,7 @@
 #pragma once
 
 #include "LinBusLog.h"
+#include "LinBusDiag.h"
 #include "esphome/core/component.h"
 #include "esphome/components/uart/uart.h"
 
@@ -62,7 +63,17 @@ class LinBusListener : public PollingComponent, public uart::UARTDevice {
   // host-side test harnesses that feed bytes without an ESP32 UART.
   void onReceive_();
 
+  // Filled by the UART task (uartEventTask_), drained by the main loop. Copy-only: never blocks.
+  SpscRing<DiagFrame, 64> diag_frames_;
+
  private:
+  uint32_t diag_pid_us_ = 0;
+  uint32_t diag_echo_us_ = 0;
+  uint8_t diag_written_[9] = {};
+  uint8_t diag_written_len_ = 0;
+  bool diag_pushed_ = false;
+  void diag_push_frame_();
+
   // Microseconds per UART Baud
   uint32_t time_per_baud_;
   // LIN break = 13 bit times minimum (spec allows 9–15)
@@ -105,6 +116,8 @@ class LinBusListener : public PollingComponent, public uart::UARTDevice {
     this->current_data_valid = true;
     this->current_data_count_ = 0;
     memset(this->current_data_, 0, sizeof(this->current_data_));
+    this->diag_pushed_ = false;
+    this->diag_written_len_ = 0;
   };
   void read_lin_frame_();
   void clear_uart_buffer_();

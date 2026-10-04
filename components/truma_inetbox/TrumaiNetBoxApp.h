@@ -1,7 +1,9 @@
 #pragma once
 
 #include <atomic>
+#include <string>
 
+#include "LinBusDiag.h"
 #include "LinBusProtocol.h"
 #include "TrumaStructs.h"
 #include "TrumaiNetBoxAppAirconAuto.h"
@@ -60,6 +62,17 @@ class TrumaiNetBoxApp : public LinBusProtocol {
   time::RealTimeClock *get_time() const { return time_; }
 #endif  // USE_TIME
 
+  // Diagnostics (main loop): raw frame capture on/off, JSON batches of frames, JSON protocol events.
+  void set_diag_capture(bool enabled) { this->diag_capture_ = enabled; }
+  bool get_diag_capture() const { return this->diag_capture_; }
+  void add_on_diag_frames_callback(std::function<void(const std::string &)> callback) {
+    this->diag_frames_callback_.add(std::move(callback));
+  }
+  void add_on_diag_event_callback(std::function<void(const std::string &)> callback) {
+    this->diag_event_callback_.add(std::move(callback));
+  }
+  const LatencyHistogram &diag_latency() const { return this->diag_latency_; }
+
  protected:
   // Truma CP Plus needs init (reset). This device is not registered.
   // Accessed from both the UART ISR/task and the main loop — must be atomic.
@@ -112,6 +125,22 @@ class TrumaiNetBoxApp : public LinBusProtocol {
   void lin_message_received_(const uint8_t pid, const uint8_t *message, uint8_t length) override;
   void publish_status_2_();
   void publish_vent_mode_();
+
+  void lin_diag_event_(DiagEventKind kind, uint8_t a = 0, uint8_t b = 0, uint16_t v = 0) override;
+  void diag_drain_();
+  void diag_emit_(uint32_t t_us, const char *ev, const std::string &fields);
+  SpscRing<DiagEvent, 32> diag_events_;  // producer: LIN event task
+  uint16_t diag_heater_error_{0};        // LIN event task only
+  bool diag_capture_{false};             // main loop from here on
+  bool diag_registered_{false};
+  std::string diag_batch_;
+  uint32_t diag_batch_start_us_{0};
+  uint32_t diag_stats_start_us_{0};
+  uint32_t diag_dropped_{0};
+  uint32_t diag_checksum_errors_{0};
+  LatencyHistogram diag_latency_;
+  CallbackManager<void(const std::string &)> diag_frames_callback_{};
+  CallbackManager<void(const std::string &)> diag_event_callback_{};
 
   uint8_t lin_read_field_by_identifier_(uint8_t identifier, std::array<uint8_t, 5> *response) override;
   const uint8_t *lin_multiframe_received(const uint8_t *message, const uint8_t message_len,

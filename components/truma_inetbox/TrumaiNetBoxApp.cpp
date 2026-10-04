@@ -1,4 +1,5 @@
 #include "TrumaiNetBoxApp.h"
+#include <cinttypes>
 #include "TrumaStatusFrameBuilder.h"
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
@@ -18,6 +19,8 @@ static constexpr uint8_t VENT_MODE_SHIFT = 4;
 // The original box always transfers the full 40-byte buffer (first frame 03 10 29 FA); CP-Plus C3.00.00
 // accepted every upload in that form. Shorter Truma frames are padded with zeros (checksum unchanged).
 static constexpr uint8_t TRUMA_TRANSFER_LEN = 41;  // SID + 40-byte buffer
+static constexpr uint32_t DIAG_BATCH_US = 1000 * 1000;       // publish raw frames about once a second
+static constexpr uint32_t DIAG_STATS_US = 60 * 1000 * 1000;  // latency/error summary every minute
 
 TrumaiNetBoxApp::TrumaiNetBoxApp() {
   this->airconAuto_.set_parent(this);
@@ -29,6 +32,8 @@ TrumaiNetBoxApp::TrumaiNetBoxApp() {
 }
 
 void TrumaiNetBoxApp::update() {
+  this->diag_drain_();
+
   // Call listeners in after method 'lin_multiframe_received' call.
   // Because 'lin_multiframe_received' is time critical an all these sensors can take some time.
 
@@ -238,6 +243,8 @@ const uint8_t *TrumaiNetBoxApp::lin_multiframe_received(const uint8_t *message, 
       if (*return_len > 0 && *return_len < TRUMA_TRANSFER_LEN) {
         *return_len = TRUMA_TRANSFER_LEN;
       }
+      this->lin_diag_event_(DiagEventKind::UPLOAD, response_frame->genericHeader.message_type,
+                            response_frame->genericHeader.command_counter);
       return response;
     }
   }
@@ -261,6 +268,7 @@ const uint8_t *TrumaiNetBoxApp::lin_multiframe_received(const uint8_t *message, 
     ESP_LOGE(TAG, "Truma checksum fail.");
     return nullptr;
   }
+  this->lin_diag_event_(DiagEventKind::DOWNLOAD, header->message_type, header->message_length);
 
   // create acknowledge response.
   response[0] = (header->service_identifier | LIN_SID_RESPONSE);
@@ -271,6 +279,11 @@ const uint8_t *TrumaiNetBoxApp::lin_multiframe_received(const uint8_t *message, 
     // Example:
     // SID<---------PREAMBLE---------->|<---MSG_HEAD---->|tRoom|mo|  |elecA|tWate|elecB|mi|mi|cWate|cRoom|st|err  |  |
     // BB.00.1F.00.1E.00.00.22.FF.FF.FF.54.01.14.33.00.12.00.00.00.00.00.00.00.00.00.00.01.01.CC.0B.6C.0B.00.00.00.00
+    const uint16_t error_code = statusFrame->heater.error_code_low | (statusFrame->heater.error_code_high << 8);
+    if (error_code != this->diag_heater_error_) {
+      this->diag_heater_error_ = error_code;
+      this->lin_diag_event_(DiagEventKind::HEATER_ERROR, 0, 0, error_code);
+    }
     this->heater_.set_status(statusFrame->heater);
     return response;
   } else if (header->message_type == STATUS_FRAME_AIRCON_MANUAL &&
@@ -352,6 +365,7 @@ const uint8_t *TrumaiNetBoxApp::lin_multiframe_received(const uint8_t *message, 
     // SID<---------PREAMBLE---------->|<---MSG_HEAD---->|
     // BB.00.1F.00.1E.00.00.22.FF.FF.FF.54.01.02.0D.01.98.02.00
     auto data = statusFrame->responseAck;
+    this->lin_diag_event_(DiagEventKind::ACK, statusFrame->genericHeader.command_counter, (uint8_t) data.error_code);
 
     if (data.error_code != ResponseAckResult::RESPONSE_ACK_RESULT_OKAY) {
       ESP_LOGW(TAG, "StatusFrameResponseAck");
@@ -467,6 +481,97 @@ bool TrumaiNetBoxApp::has_update_to_submit_() {
     }
   }
   return false;
+}
+
+void TrumaiNetBoxApp::lin_diag_event_(DiagEventKind kind, uint8_t a, uint8_t b, uint16_t v) {
+  this->diag_events_.push(DiagEvent{micros(), kind, a, b, v});
+}
+
+void TrumaiNetBoxApp::diag_emit_(uint32_t t_us, const char *ev, const std::string &fields) {
+  this->diag_event_callback_.call(str_sprintf("{\"t\":%" PRIu32 ",\"ev\":\"%s\"%s}", t_us, ev, fields.c_str()));
+}
+
+// Main loop only: turns the frames and events recorded by the LIN tasks into JSON for the callbacks.
+void TrumaiNetBoxApp::diag_drain_() {
+  const uint32_t now = micros();
+  if (this->diag_stats_start_us_ == 0) {
+    this->diag_stats_start_us_ = now;
+  }
+
+  DiagFrame frame;
+  while (this->diag_frames_.pop(&frame)) {
+    if (frame.ours) {
+      this->diag_latency_.add(frame.latency_us);
+      if (!frame.echo_ok) {
+        this->diag_emit_(frame.t_us, "echo_mismatch", str_sprintf(",\"pid\":\"%02x\"", frame.pid_byte));
+      }
+    } else if (frame.len == 9 && frame.data[8] != data_checksum(frame.data, 8, 0) &&
+               frame.data[8] != data_checksum(frame.data, 8, frame.pid_byte)) {
+      this->diag_checksum_errors_++;
+    }
+    if (this->diag_capture_) {
+      if (this->diag_batch_.empty()) {
+        this->diag_batch_ = "{\"f\":[";
+        this->diag_batch_start_us_ = now;
+      } else {
+        this->diag_batch_ += ',';
+      }
+      this->diag_batch_ += str_sprintf("[%" PRIu32 ",\"%02x\",\"%s\",%u]", frame.t_us, frame.pid_byte,
+                                       format_hex(frame.data, frame.len).c_str(), frame.ours ? 1u : 0u);
+    }
+  }
+  this->diag_dropped_ += this->diag_frames_.take_dropped();
+  if (!this->diag_batch_.empty() && (!this->diag_capture_ || now - this->diag_batch_start_us_ >= DIAG_BATCH_US)) {
+    this->diag_batch_ += str_sprintf("],\"drop\":%" PRIu32 "}", this->diag_dropped_);
+    this->diag_dropped_ = 0;
+    this->diag_frames_callback_.call(this->diag_batch_);
+    this->diag_batch_.clear();
+  }
+
+  DiagEvent event;
+  while (this->diag_events_.pop(&event)) {
+    switch (event.kind) {
+      case DiagEventKind::B2_ANSWERED:
+        this->diag_emit_(event.t_us, "b2", str_sprintf(",\"id\":\"%02x\",\"len\":%u", event.a, event.b));
+        break;
+      case DiagEventKind::HEARTBEAT:
+      case DiagEventKind::DOWNLOAD:
+        if (!this->diag_registered_) {
+          this->diag_registered_ = true;
+          this->diag_emit_(event.t_us, "registered", "");
+        }
+        if (event.kind == DiagEventKind::DOWNLOAD) {
+          this->diag_emit_(event.t_us, "download", str_sprintf(",\"type\":\"%02x\",\"len\":%u", event.a, event.b));
+        }
+        break;
+      case DiagEventKind::UPLOAD:
+        this->diag_emit_(event.t_us, "upload", str_sprintf(",\"type\":\"%02x\",\"ctr\":%u", event.a, event.b));
+        break;
+      case DiagEventKind::ACK:
+        this->diag_emit_(event.t_us, "ack", str_sprintf(",\"ctr\":%u,\"code\":%u", event.a, event.b));
+        break;
+      case DiagEventKind::HEATER_ERROR:
+        this->diag_emit_(event.t_us, "heater_error", str_sprintf(",\"code\":%u", event.v));
+        break;
+      case DiagEventKind::ANSWER_DROPPED:
+        this->diag_emit_(event.t_us, "answer_dropped", str_sprintf(",\"nad\":\"%02x\"", event.a));
+        break;
+    }
+  }
+  this->diag_dropped_ += this->diag_events_.take_dropped();
+
+  if (now - this->diag_stats_start_us_ >= DIAG_STATS_US) {
+    const auto &lat = this->diag_latency_;
+    this->diag_emit_(now, "stats",
+                     str_sprintf(",\"n\":%" PRIu32 ",\"min\":%" PRIu32 ",\"p99\":%" PRIu32 ",\"max\":%" PRIu32
+                                 ",\"cs_err\":%" PRIu32 ",\"drop\":%" PRIu32,
+                                 lat.count(), lat.min(), lat.percentile_us(99), lat.max(), this->diag_checksum_errors_,
+                                 this->diag_dropped_));
+    this->diag_latency_.reset();
+    this->diag_checksum_errors_ = 0;
+    this->diag_dropped_ = 0;
+    this->diag_stats_start_us_ = now;
+  }
 }
 
 }  // namespace truma_inetbox

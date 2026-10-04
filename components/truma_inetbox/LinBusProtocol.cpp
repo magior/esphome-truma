@@ -56,6 +56,7 @@ void LinBusProtocol::lin_message_received_(const uint8_t pid, const uint8_t *mes
         // poll 0x3D for us any more, and a late answer would collide with the other node's response.
         if (this->has_update_to_send_()) {
           xQueueReset(this->updates_to_send_);
+          this->lin_diag_event_(DiagEventKind::ANSWER_DROPPED, message[0]);
           ESP_LOGW(TAG, "Pending LIN answer dropped: master addressed NAD %02X.", message[0]);
         }
         return;
@@ -134,6 +135,7 @@ void LinBusProtocol::lin_msg_diag_single_(const uint8_t *message, uint8_t length
         response[4] = 0x12;
       }
       this->prepare_update_msg_(response);
+      this->lin_diag_event_(DiagEventKind::B2_ANSWERED, identifier, identifier_len);
     }
   } else if (my_node_address && service_identifier == LIN_SID_HEARTBEAT && message_length >= 5) {
     // if (message[3] == 0x00 && message[4] == 0x1F && message[5] == 0x00 && message[6] == 0x00) {
@@ -145,6 +147,7 @@ void LinBusProtocol::lin_msg_diag_single_(const uint8_t *message, uint8_t length
     this->prepare_update_msg_(response);
 
     this->lin_heartbeat();
+    this->lin_diag_event_(DiagEventKind::HEARTBEAT);
     //}
   } else if (broadcast_address && service_identifier == LIN_SID_ASSIGN_NAD && message_length == 6) {
     if (this->is_matching_identifier_(&message[3])) {
