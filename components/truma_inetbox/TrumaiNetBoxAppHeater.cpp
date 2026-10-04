@@ -63,6 +63,13 @@ bool TrumaiNetBoxAppHeater::can_update() {
          this->parent_->get_heater_device() != TRUMA_DEVICE::UNKNOWN;
 }
 
+HeatingMode TrumaiNetBoxAppHeater::fan_mode_heating_mode(bool high) const {
+  if (this->parent_->get_heater_device() == TRUMA_DEVICE::HEATER_VARIO) {
+    return high ? HeatingMode::HEATING_MODE_VARIO_HEAT_AUTO : HeatingMode::HEATING_MODE_VARIO_HEAT_NIGHT;
+  }
+  return high ? HeatingMode::HEATING_MODE_HIGH : HeatingMode::HEATING_MODE_ECO;
+}
+
 bool TrumaiNetBoxAppHeater::action_heater_room(uint8_t temperature, HeatingMode mode) {
   if (!this->can_update()) {
     ESP_LOGW(TAG, "Cannot update Truma.");
