@@ -45,29 +45,30 @@ StatusFrameAirconManualResponse *TrumaiNetBoxAppAirconManual::update_prepare() {
 
 void TrumaiNetBoxAppAirconManual::create_update_data(StatusFrame *response, uint8_t *response_len,
                                                      uint8_t command_counter) {
+  std::lock_guard<std::mutex> guard(this->lock_);
   status_frame_create_empty(response, STATUS_FRAME_AIRCON_MANUAL_RESPONSE, sizeof(StatusFrameAirconManualResponse),
                             command_counter);
 
   // CP Plus C.04.05.02 reports vent mode 0xFF while the aircon is off (issue #28). Echoing it back
   // is rejected with ACK 0x02, so replace any unknown value before sending.
-  AirconVentMode vent_mode = this->update_status_.vent_mode;
+  AirconVentMode vent_mode = this->submitted_.vent_mode;
   if (!is_valid_vent_mode(vent_mode)) {
-    vent_mode = this->update_status_.mode == AirconMode::AIRCON_MODE_AUTO ? AirconVentMode::AIRCON_VENT_AUTO
-                                                                          : AirconVentMode::AIRCON_VENT_LOW;
-    ESP_LOGD(TAG, "Unknown vent mode 0x%02X replaced by 0x%02X", (uint8_t) this->update_status_.vent_mode,
+    vent_mode = this->submitted_.mode == AirconMode::AIRCON_MODE_AUTO ? AirconVentMode::AIRCON_VENT_AUTO
+                                                                       : AirconVentMode::AIRCON_VENT_LOW;
+    ESP_LOGD(TAG, "Unknown vent mode 0x%02X replaced by 0x%02X", (uint8_t) this->submitted_.vent_mode,
              (uint8_t) vent_mode);
   }
 
-  response->airconManualResponse.mode = this->update_status_.mode;
+  response->airconManualResponse.mode = this->submitted_.mode;
   response->airconManualResponse.unknown_02 = 0x00;
   response->airconManualResponse.vent_mode = vent_mode;
   response->airconManualResponse.aircon_on = 0x01;  // Must always be 1
-  response->airconManualResponse.target_temp_aircon = this->update_status_.target_temp_aircon;
+  response->airconManualResponse.target_temp_aircon = this->submitted_.target_temp_aircon;
   // Copied from the last status frame in update_prepare(), so other commands keep the light as it is.
-  response->airconManualResponse.light = this->update_status_.light;
+  response->airconManualResponse.light = this->submitted_.light;
   memset(response->airconManualResponse.padding, 0x00, sizeof(response->airconManualResponse.padding));
   // Echo the water target from the last aircon status frame, otherwise the write turns the water heater off.
-  response->airconManualResponse.target_temp_water = this->data_.target_temp_water;
+  response->airconManualResponse.target_temp_water = this->incoming_.target_temp_water;
 
   status_frame_calculate_checksum(response);
   (*response_len) = sizeof(StatusFrameHeader) + sizeof(StatusFrameAirconManualResponse);
