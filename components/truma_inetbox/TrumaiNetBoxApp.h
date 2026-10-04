@@ -128,6 +128,9 @@ class TrumaiNetBoxApp : public LinBusProtocol {
 
   void lin_diag_event_(DiagEventKind kind, uint8_t a = 0, uint8_t b = 0, uint16_t v = 0) override;
   void diag_drain_();
+  void diag_queued_check_();
+  bool diag_heater_queued_{false};  // main loop only
+  bool diag_timer_queued_{false};
   void diag_emit_(uint32_t t_us, const char *ev, const std::string &fields);
   SpscRing<DiagEvent, 32> diag_events_;  // producer: LIN event task
   uint16_t diag_heater_error_{0};        // LIN event task only

@@ -33,6 +33,7 @@ TrumaiNetBoxApp::TrumaiNetBoxApp() {
 
 void TrumaiNetBoxApp::update() {
   this->diag_drain_();
+  this->diag_queued_check_();
 
   // Call listeners in after method 'lin_multiframe_received' call.
   // Because 'lin_multiframe_received' is time critical an all these sensors can take some time.
@@ -265,6 +266,7 @@ const uint8_t *TrumaiNetBoxApp::lin_multiframe_received(const uint8_t *message, 
   if (header->checksum != data_checksum(&statusFrame->raw[STATUS_FRAME_CHECKSUM_START],
                                         sizeof(StatusFrame) - STATUS_FRAME_CHECKSUM_START, (0xFF - header->checksum)) ||
       header->header_2 != 'T' || header->header_3 != 0x01) {
+    this->lin_diag_event_(DiagEventKind::DOWNLOAD_BAD, header->message_type, header->message_length);
     ESP_LOGE(TAG, "Truma checksum fail.");
     return nullptr;
   }
@@ -487,6 +489,20 @@ void TrumaiNetBoxApp::lin_diag_event_(DiagEventKind kind, uint8_t a, uint8_t b, 
   this->diag_events_.push(DiagEvent{micros(), kind, a, b, v});
 }
 
+// Main loop only: a command was queued when has_update() turns true (the counter is assigned at upload).
+void TrumaiNetBoxApp::diag_queued_check_() {
+  const bool heater = this->heater_.has_update();
+  if (heater && !this->diag_heater_queued_) {
+    this->diag_emit_(micros(), "queued", ",\"type\":\"32\"");
+  }
+  this->diag_heater_queued_ = heater;
+  const bool timer = this->timer_.has_update();
+  if (timer && !this->diag_timer_queued_) {
+    this->diag_emit_(micros(), "queued", ",\"type\":\"3c\"");
+  }
+  this->diag_timer_queued_ = timer;
+}
+
 void TrumaiNetBoxApp::diag_emit_(uint32_t t_us, const char *ev, const std::string &fields) {
   this->diag_event_callback_.call(str_sprintf("{\"t\":%" PRIu32 ",\"ev\":\"%s\"%s}", t_us, ev, fields.c_str()));
 }
@@ -536,12 +552,15 @@ void TrumaiNetBoxApp::diag_drain_() {
         break;
       case DiagEventKind::HEARTBEAT:
       case DiagEventKind::DOWNLOAD:
+      case DiagEventKind::DOWNLOAD_BAD:
         if (!this->diag_registered_) {
           this->diag_registered_ = true;
           this->diag_emit_(event.t_us, "registered", "");
         }
-        if (event.kind == DiagEventKind::DOWNLOAD) {
-          this->diag_emit_(event.t_us, "download", str_sprintf(",\"type\":\"%02x\",\"len\":%u", event.a, event.b));
+        if (event.kind != DiagEventKind::HEARTBEAT) {
+          this->diag_emit_(event.t_us, "download",
+                           str_sprintf(",\"type\":\"%02x\",\"len\":%u,\"ok\":%u", event.a, event.b,
+                                       event.kind == DiagEventKind::DOWNLOAD ? 1u : 0u));
         }
         break;
       case DiagEventKind::UPLOAD:

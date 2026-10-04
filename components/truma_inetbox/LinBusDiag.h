@@ -20,7 +20,8 @@ struct DiagFrame {
   uint16_t latency_us;  // response start after the PID (only when ours)
 };
 
-enum class DiagEventKind : uint8_t { B2_ANSWERED, HEARTBEAT, DOWNLOAD, UPLOAD, ACK, HEATER_ERROR, ANSWER_DROPPED };
+enum class DiagEventKind : uint8_t { B2_ANSWERED, HEARTBEAT, DOWNLOAD, UPLOAD, ACK, HEATER_ERROR, ANSWER_DROPPED,
+                                      DOWNLOAD_BAD };
 
 // Protocol event recorded by the LIN event task.
 struct DiagEvent {
