@@ -156,30 +156,26 @@ void TrumaiNetBoxApp::publish_vent_mode_() {
   this->vent_mode_callback_.call(vent_mode);
 }
 
-bool TrumaiNetBoxApp::lin_read_field_by_identifier_(uint8_t identifier, std::array<uint8_t, 5> *response) {
+uint8_t TrumaiNetBoxApp::lin_read_field_by_identifier_(uint8_t identifier, std::array<uint8_t, 5> *response) {
+  // Answers of the original iNet Box (WomoLIN C4.01.01 init logs). Verified on CP-Plus C3.00.00:
+  // the panel registers the box without B0 and lists it as T2.02.00.
   if (identifier == 0x00 /* LIN Product Identification */) {
     const auto lin_identifier = this->lin_identifier();
-    (*response)[0] = lin_identifier[0];
-    (*response)[1] = lin_identifier[1];
-    (*response)[2] = lin_identifier[2];
-    (*response)[3] = lin_identifier[3];
-    (*response)[4] = 0x01;  // Variant
-    return true;
-  } else if (identifier == 0x20 /* Product details to display in CP plus */) {
-    const auto lin_identifier = this->lin_identifier();
-    // Only the first three parts are displayed.
-    (*response)[0] = lin_identifier[0];
-    (*response)[1] = lin_identifier[1];
-    (*response)[2] = lin_identifier[2];
-    // (*response)[3] = // unknown
-    // (*response)[4] = // unknown
-    return true;
-  } else if (identifier == 0x22 /* unknown usage */) {
-    // Init is failing if missing
-    // Data can be anything?
-    return true;
+    std::copy(lin_identifier.begin(), lin_identifier.end(), response->begin());
+    (*response)[4] = 0x00;  // Variant
+    return 5;
+  } else if (identifier == 0x20 /* Software version shown in the CP Plus device list */) {
+    (*response)[0] = 0x02;
+    (*response)[1] = 0x02;
+    (*response)[2] = 0x00;
+    return 3;
+  } else if (identifier == 0x22 /* unknown usage, asked by C4 panels; init fails if missing */) {
+    (*response)[0] = 0x03;
+    (*response)[1] = 0x07;
+    (*response)[2] = 0x00;
+    return 3;
   }
-  return false;
+  return 0;
 }
 
 const uint8_t *TrumaiNetBoxApp::lin_multiframe_received(const uint8_t *message, const uint8_t message_len,

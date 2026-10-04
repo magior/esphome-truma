@@ -110,7 +110,7 @@ class TrumaiNetBoxApp : public LinBusProtocol {
   void publish_status_2_();
   void publish_vent_mode_();
 
-  bool lin_read_field_by_identifier_(uint8_t identifier, std::array<uint8_t, 5> *response) override;
+  uint8_t lin_read_field_by_identifier_(uint8_t identifier, std::array<uint8_t, 5> *response) override;
   const uint8_t *lin_multiframe_received(const uint8_t *message, const uint8_t message_len,
                                           uint8_t *return_len) override;
 
