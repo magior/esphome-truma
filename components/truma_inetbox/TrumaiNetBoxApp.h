@@ -31,6 +31,8 @@ class TrumaiNetBoxApp : public LinBusProtocol {
 
   TRUMA_DEVICE get_heater_device() const { return this->heater_device_.load(std::memory_order_relaxed); }
   TRUMA_DEVICE get_aircon_device() const { return this->aircon_device_.load(std::memory_order_relaxed); }
+  // Software major of the CP-Plus (device 0 of the device list), 0 until known. C3.00.00 reports 0x03.
+  uint8_t get_cpplus_software_major() const { return this->cpplus_software_major_.load(std::memory_order_relaxed); }
 
   TrumaiNetBoxAppAirconAuto *get_aircon_auto() { return &this->airconAuto_; }
   TrumaiNetBoxAppAirconManual *get_aircon_manual() { return &this->airconManual_; }
@@ -71,6 +73,7 @@ class TrumaiNetBoxApp : public LinBusProtocol {
   // Written from lin_event_task, read from main loop — must be atomic.
   std::atomic<TRUMA_DEVICE> heater_device_{TRUMA_DEVICE::UNKNOWN};
   std::atomic<TRUMA_DEVICE> aircon_device_{TRUMA_DEVICE::UNKNOWN};
+  std::atomic<uint8_t> cpplus_software_major_{0};
 
   TrumaiNetBoxAppAirconAuto airconAuto_;
   TrumaiNetBoxAppAirconManual airconManual_;

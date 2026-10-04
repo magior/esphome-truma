@@ -406,7 +406,9 @@ const uint8_t *TrumaiNetBoxApp::lin_multiframe_received(const uint8_t *message, 
     // first submitted device is CP Plus device
     const auto is_CPPLUSDevice = device.device_id == 0;
 
-    if (!is_CPPLUSDevice) {
+    if (is_CPPLUSDevice) {
+      this->cpplus_software_major_.store(device.software_revision[0], std::memory_order_relaxed);
+    } else {
       // Assumption first device is Heater
       if (device.device_id == 1) {
         this->heater_device_.store(truma_device, std::memory_order_relaxed);
