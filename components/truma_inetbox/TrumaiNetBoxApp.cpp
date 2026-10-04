@@ -15,6 +15,9 @@ static constexpr uint32_t UPDATE_RETRY_DELAY_US = 5 * 1000 * 1000;  // 5 seconds
 static constexpr uint8_t STATUS_2_MIN_LENGTH = 2;                   // PID 0x22: only bytes 0 and 1 are exposed
 static constexpr uint8_t COMMAND_STATUS_VENT_BYTE = 5;              // PID 0x20: vent mode in the high nibble
 static constexpr uint8_t VENT_MODE_SHIFT = 4;
+// The original box always transfers the full 40-byte buffer (first frame 03 10 29 FA); CP-Plus C3.00.00
+// accepted every upload in that form. Shorter Truma frames are padded with zeros (checksum unchanged).
+static constexpr uint8_t TRUMA_TRANSFER_LEN = 41;  // SID + 40-byte buffer
 
 TrumaiNetBoxApp::TrumaiNetBoxApp() {
   this->airconAuto_.set_parent(this);
@@ -180,7 +183,7 @@ uint8_t TrumaiNetBoxApp::lin_read_field_by_identifier_(uint8_t identifier, std::
 
 const uint8_t *TrumaiNetBoxApp::lin_multiframe_received(const uint8_t *message, const uint8_t message_len,
                                                          uint8_t *return_len) {
-  static uint8_t response[sizeof(StatusFrame)] = {};
+  static uint8_t response[sizeof(StatusFrame) > TRUMA_TRANSFER_LEN ? sizeof(StatusFrame) : TRUMA_TRANSFER_LEN] = {};
   // Validate message prefix.
   if (message_len < truma_message_header.size()) {
     return nullptr;
@@ -199,41 +202,43 @@ const uint8_t *TrumaiNetBoxApp::lin_multiframe_received(const uint8_t *message, 
     // Example: BA.00.1F.00.1E.00.00.22.FF.FF.FF (11)
     memset(response, 0, sizeof(response));
     auto response_frame = reinterpret_cast<StatusFrame *>(response);
+    bool answered = true;
 
     // The order must match with the method 'has_update_to_submit_'.
     if (this->init_received_.load(std::memory_order_relaxed) == 0) {
       ESP_LOGD(TAG, "Requested read: Sending init");
       status_frame_create_init(response_frame, return_len, this->message_counter++);
-      return response;
     } else if (this->heater_.has_update()) {
       ESP_LOGD(TAG, "Requested read: Sending heater update");
       this->heater_.create_update_data(response_frame, return_len, this->message_counter++);
       this->update_time_.store(0, std::memory_order_relaxed);
-      return response;
     } else if (this->timer_.has_update()) {
       ESP_LOGD(TAG, "Requested read: Sending timer update");
       this->timer_.create_update_data(response_frame, return_len, this->message_counter++);
       this->update_time_.store(0, std::memory_order_relaxed);
-      return response;
     } else if (this->airconManual_.has_update()) {
       ESP_LOGD(TAG, "Requested read: Sending aircon manual update");
       this->airconManual_.create_update_data(response_frame, return_len, this->message_counter++);
       this->update_time_.store(0, std::memory_order_relaxed);
-      return response;
     } else if (this->airconAuto_.has_update()) {
       ESP_LOGD(TAG, "Requested read: Sending aircon auto update");
       this->airconAuto_.create_update_data(response_frame, return_len, this->message_counter++);
       this->update_time_.store(0, std::memory_order_relaxed);
-      return response;
 #ifdef USE_TIME
     } else if (this->clock_.has_update()) {
       ESP_LOGD(TAG, "Requested read: Sending clock update");
       this->clock_.create_update_data(response_frame, return_len, this->message_counter++);
       this->update_time_.store(0, std::memory_order_relaxed);
-      return response;
 #endif  // USE_TIME
     } else {
       ESP_LOGW(TAG, "Requested read: CP Plus asks for an update, but I have none.");
+      answered = false;
+    }
+    if (answered) {
+      if (*return_len > 0 && *return_len < TRUMA_TRANSFER_LEN) {
+        *return_len = TRUMA_TRANSFER_LEN;
+      }
+      return response;
     }
   }
 
