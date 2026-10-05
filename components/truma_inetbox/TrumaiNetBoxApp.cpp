@@ -486,7 +486,7 @@ bool TrumaiNetBoxApp::has_update_to_submit_() {
 }
 
 void TrumaiNetBoxApp::lin_diag_event_(DiagEventKind kind, uint8_t a, uint8_t b, uint16_t v) {
-  this->diag_events_.push(DiagEvent{micros(), kind, a, b, v});
+  this->diag_events_.push(DiagEvent{micros(), kind, a, b, v, !this->get_observer_mode()});
 }
 
 // Main loop only: a command was queued when has_update() turns true (the counter is assigned at upload).
@@ -548,14 +548,16 @@ void TrumaiNetBoxApp::diag_drain_() {
   while (this->diag_events_.pop(&event)) {
     switch (event.kind) {
       case DiagEventKind::B2_ANSWERED:
-        this->diag_emit_(event.t_us, "b2", str_sprintf(",\"id\":\"%02x\",\"len\":%u", event.a, event.b));
+        this->diag_emit_(event.t_us, "b2", str_sprintf(",\"id\":\"%02x\",\"len\":%u,\"tx\":%u", event.a, event.b,
+                                                    event.tx ? 1u : 0u));
         break;
       case DiagEventKind::HEARTBEAT:
       case DiagEventKind::DOWNLOAD:
       case DiagEventKind::DOWNLOAD_BAD:
-        if (!this->diag_registered_) {
-          this->diag_registered_ = true;
-          this->diag_emit_(event.t_us, "registered", "");
+        // Once per transmit state: "registered" in observer mode only proves the box is heard, not that it answers.
+        if (this->diag_registered_tx_ != (event.tx ? 1 : 0)) {
+          this->diag_registered_tx_ = event.tx ? 1 : 0;
+          this->diag_emit_(event.t_us, "registered", str_sprintf(",\"tx\":%u", event.tx ? 1u : 0u));
         }
         if (event.kind != DiagEventKind::HEARTBEAT) {
           this->diag_emit_(event.t_us, "download",

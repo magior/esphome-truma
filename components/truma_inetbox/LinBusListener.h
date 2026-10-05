@@ -42,7 +42,8 @@ class LinBusListener : public PollingComponent, public uart::UARTDevice {
   void set_lin_checksum(LIN_CHECKSUM val) { this->lin_checksum_ = val; }
   void set_cs_pin(GPIOPin *pin) { this->cs_pin_ = pin; }
   void set_fault_pin(GPIOPin *pin) { this->fault_pin_ = pin; }
-  void set_observer_mode(bool val) { this->observer_mode_ = val; }
+  void set_observer_mode(bool val) { this->observer_mode_.store(val, std::memory_order_relaxed); }
+  bool get_observer_mode() const { return this->observer_mode_.load(std::memory_order_relaxed); }
   bool get_lin_bus_fault() { return fault_on_lin_bus_reported_ > 3; }
 
   void process_lin_msg_queue(TickType_t xTicksToWait);
@@ -52,7 +53,8 @@ class LinBusListener : public PollingComponent, public uart::UARTDevice {
   LIN_CHECKSUM lin_checksum_ = LIN_CHECKSUM::LIN_CHECKSUM_VERSION_2;
   GPIOPin *cs_pin_ = nullptr;
   GPIOPin *fault_pin_ = nullptr;
-  bool observer_mode_ = false;
+  // Written by the main loop, read by the UART task and the LIN event task.
+  std::atomic<bool> observer_mode_{false};
 
   // Must only be called from uartEventTask_ — not ISR-safe, not main-loop-safe.
   void write_lin_answer_(const uint8_t *data, uint8_t len);

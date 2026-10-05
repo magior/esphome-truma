@@ -30,6 +30,7 @@ struct DiagEvent {
   uint8_t a;
   uint8_t b;
   uint16_t v;
+  bool tx;  // the box transmits (observer mode off) when the event was created
 };
 
 // Single-producer / single-consumer ring (producer: a LIN task, consumer: the ESPHome main loop).

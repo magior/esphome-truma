@@ -135,7 +135,7 @@ class TrumaiNetBoxApp : public LinBusProtocol {
   SpscRing<DiagEvent, 32> diag_events_;  // producer: LIN event task
   uint16_t diag_heater_error_{0};        // LIN event task only
   bool diag_capture_{false};             // main loop from here on
-  bool diag_registered_{false};
+  int8_t diag_registered_tx_{-1};  // tx state "registered" was last emitted for; -1 = not yet
   std::string diag_batch_;
   uint32_t diag_batch_start_us_{0};
   uint32_t diag_stats_start_us_{0};

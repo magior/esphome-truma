@@ -35,7 +35,7 @@ void LinBusListener::dump_config() {
   LOG_PIN("  FAULT Pin: ", this->fault_pin_);
   LOG_UPDATE_INTERVAL(this);
   ESP_LOGCONFIG(TAG, "  LIN checksum Version: %d", this->lin_checksum_ == LIN_CHECKSUM::LIN_CHECKSUM_VERSION_1 ? 1 : 2);
-  ESP_LOGCONFIG(TAG, "  Observer mode: %s", YESNO(this->observer_mode_));
+  ESP_LOGCONFIG(TAG, "  Observer mode: %s", YESNO(this->get_observer_mode()));
   this->check_uart_settings(9600, 2, esphome::uart::UART_CONFIG_PARITY_NONE, 8);
 }
 
@@ -67,7 +67,7 @@ void LinBusListener::setup() {
 
   if (this->cs_pin_ != nullptr) {
     // Enable LIN driver if not in oberserver mode.
-    this->cs_pin_->digital_write(!this->observer_mode_);
+    this->cs_pin_->digital_write(!this->get_observer_mode());
   }
 }
 
@@ -102,7 +102,7 @@ void LinBusListener::write_lin_answer_(const uint8_t *data, uint8_t len) {
   // Check when last byte was read from buffer and wait at least one baud time.
   // It is working when I answer quicker.
 
-  if (!this->observer_mode_) {
+  if (!this->get_observer_mode()) {
     this->current_PID_order_answered_ = true;
     memcpy(this->diag_written_, data, len);
     this->diag_written_[len] = data_CRC;
@@ -396,7 +396,7 @@ void LinBusListener::process_log_queue(TickType_t xTicksToWait) {
         ESP_LOGE(TAG, "LIN answer cannot be longer than 8 bytes.");
         break;
       case QUEUE_LOG_MSG_TYPE::VERBOSE_LIN_ANSWER_RESPONSE:
-        if (!this->observer_mode_) {
+        if (!this->get_observer_mode()) {
           ESP_LOGV(TAG, "RESPONSE %02X %s", current_PID, format_hex_pretty(log_msg.data, log_msg.len).c_str());
         } else {
           ESP_LOGV(TAG, "RESPONSE %02X %s - NOT SEND (OBSERVER MODE)", current_PID,
