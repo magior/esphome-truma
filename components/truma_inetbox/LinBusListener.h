@@ -5,6 +5,8 @@
 #include "esphome/core/component.h"
 #include "esphome/components/uart/uart.h"
 
+#include <atomic>
+
 #ifdef USE_ESP32
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
