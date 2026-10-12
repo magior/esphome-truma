@@ -103,5 +103,19 @@ class TrumaiNetBoxAppHeaterMessageTrigger : public Trigger<const StatusFrameHeat
   }
 };
 
+class TrumaiNetBoxAppLinEventTrigger : public Trigger<std::string> {
+ public:
+  explicit TrumaiNetBoxAppLinEventTrigger(TrumaiNetBoxApp *parent) {
+    parent->add_on_diag_event_callback([this](const std::string &json) { this->trigger(json); });
+  }
+};
+
+class TrumaiNetBoxAppLinFramesTrigger : public Trigger<std::string> {
+ public:
+  explicit TrumaiNetBoxAppLinFramesTrigger(TrumaiNetBoxApp *parent) {
+    parent->add_on_diag_frames_callback([this](const std::string &json) { this->trigger(json); });
+  }
+};
+
 }  // namespace truma_inetbox
 }  // namespace esphome
