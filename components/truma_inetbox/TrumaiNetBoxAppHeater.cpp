@@ -53,9 +53,11 @@ void TrumaiNetBoxAppHeater::set_status(StatusFrameHeater val) {
                        val.current_temp_water == WAKE_UP_WATER && !this->wake_up_values_skipped_;
   if (wake_up) {
     ESP_LOGD(TAG, "Current temperatures 31.1/50°C after the heater wake-up values, keeping the last ones");
-    const bool previous = this->data_valid_.load();
-    val.current_temp_room = previous ? this->data_.current_temp_room : 0;
-    val.current_temp_water = previous ? this->data_.current_temp_water : 0;
+    std::lock_guard<std::mutex> guard(this->lock_);
+    // `incoming_` holds the last status since the reset once it was handed over or adopted.
+    const bool previous = this->data_updated_.load() || this->data_valid_.load();
+    val.current_temp_room = previous ? this->incoming_.current_temp_room : 0;
+    val.current_temp_water = previous ? this->incoming_.current_temp_water : 0;
   }
   this->wake_up_values_skipped_ = wake_up;
   TrumaStausFrameResponseStorage<StatusFrameHeater, StatusFrameHeaterResponse>::set_status(val);
@@ -68,15 +70,16 @@ void TrumaiNetBoxAppHeater::reset() {
 
 void TrumaiNetBoxAppHeater::create_update_data(StatusFrame *response, uint8_t *response_len,
                                                uint8_t command_counter) {
+  std::lock_guard<std::mutex> guard(this->lock_);
   status_frame_create_empty(response, STATUS_FRAME_HEATER_RESPONSE, sizeof(StatusFrameHeaterResponse), command_counter);
 
-  response->heaterResponse.target_temp_room = this->update_status_.target_temp_room;
-  response->heaterResponse.heating_mode = this->update_status_.heating_mode;
-  response->heaterResponse.target_temp_water = this->update_status_.target_temp_water;
-  response->heaterResponse.energy_mix_a = this->update_status_.energy_mix_a;
-  response->heaterResponse.energy_mix_b = this->update_status_.energy_mix_b;
-  response->heaterResponse.el_power_level_a = this->update_status_.el_power_level_a;
-  response->heaterResponse.el_power_level_b = this->update_status_.el_power_level_b;
+  response->heaterResponse.target_temp_room = this->submitted_.target_temp_room;
+  response->heaterResponse.heating_mode = this->submitted_.heating_mode;
+  response->heaterResponse.target_temp_water = this->submitted_.target_temp_water;
+  response->heaterResponse.energy_mix_a = this->submitted_.energy_mix_a;
+  response->heaterResponse.energy_mix_b = this->submitted_.energy_mix_b;
+  response->heaterResponse.el_power_level_a = this->submitted_.el_power_level_a;
+  response->heaterResponse.el_power_level_b = this->submitted_.el_power_level_b;
 
   status_frame_calculate_checksum(response);
   (*response_len) = sizeof(StatusFrameHeader) + sizeof(StatusFrameHeaterResponse);
