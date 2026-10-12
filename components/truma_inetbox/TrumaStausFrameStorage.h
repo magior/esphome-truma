@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <mutex>
 
 #include "esphome/core/automation.h"
 
@@ -9,29 +10,39 @@ namespace truma_inetbox {
 
 // Storage for a Truma status frame (e.g. heater, aircon, clock).
 //
-// Thread safety: `set_status` is called from the LIN eventTask_, while
-// `get_status*`, `update` and `reset` are called from the main loop.
-// The boolean flags use std::atomic to avoid torn reads. The struct `data_`
-// itself is not mutex-protected: a write of T from eventTask_ may interleave
-// with a read of T from the main loop. Risk is bounded — frames arrive every
-// ~100 ms while sensor publishes happen on main loop tick, so collisions are
-// rare and self-healing on the next frame.
+// Ownership: `data_` belongs to the main loop. The LIN eventTask_ hands a downloaded status over with
+// `set_status`, which writes `incoming_` under `lock_`; the main loop adopts it into `data_` in `update()`
+// before the callbacks run. Event task code that needs the last status reads `incoming_` under `lock_`.
+// The lock is taken only by the event task and the main loop, never by the UART task: the flags the
+// UART task reads are atomic.
 template<typename T> class TrumaStausFrameStorage {
  public:
+  // Main loop only.
   bool get_status_valid() { return this->data_valid_.load(); };
   const T *get_status() { return &this->data_; };
+  // LIN event task.
   virtual void set_status(T val) {
-    this->data_ = val;
-    this->data_valid_.store(true);
+    std::lock_guard<std::mutex> guard(this->lock_);
+    this->incoming_ = val;
     this->data_updated_.store(true);
-    this->dump_data();
+    this->on_status_received_();
   };
+  // Main loop.
   void update() {
-    if (this->data_updated_.exchange(false)) {
-      this->state_callback_.call(&this->data_);
+    {
+      std::lock_guard<std::mutex> guard(this->lock_);
+      if (!this->data_updated_.exchange(false)) {
+        return;
+      }
+      this->data_ = this->incoming_;
+      this->data_valid_.store(true);
+      this->on_status_adopted_();
     }
+    this->dump_data();
+    this->state_callback_.call(&this->data_);
   };
   virtual void reset() {
+    std::lock_guard<std::mutex> guard(this->lock_);
     this->data_valid_.store(false);
     this->data_updated_.store(false);
   };
@@ -41,10 +52,19 @@ template<typename T> class TrumaStausFrameStorage {
   virtual void dump_data() const = 0;
 
  protected:
+  // Called with `lock_` held: a status was handed over (event task) / adopted into `data_` (main loop).
+  virtual void on_status_received_() {}
+  virtual void on_status_adopted_() {}
+
   CallbackManager<void(const T *)> state_callback_{};
-  T data_;
+  std::mutex lock_;
+  // Main loop only.
+  T data_{};
+  // Last status from the event task, guarded by `lock_`.
+  T incoming_{};
+  // `data_` holds an adopted status (main loop view).
   std::atomic<bool> data_valid_{false};
-  // Value has changed notify listeners.
+  // `incoming_` holds a status the main loop has not adopted yet.
   std::atomic<bool> data_updated_{false};
 };
 

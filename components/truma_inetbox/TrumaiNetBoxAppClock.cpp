@@ -61,6 +61,7 @@ void TrumaiNetBoxAppClock::create_update_data(StatusFrame *response, uint8_t *re
   }
   ESP_LOGD(TAG, "Requested read: Sending clock update");
   auto now = this->parent_->get_time()->now();
+  std::lock_guard<std::mutex> guard(this->lock_);
 
   status_frame_create_empty(response, STATUS_FRAME_CLOCK_RESPONSE, sizeof(StatusFrameClock), command_counter);
 
@@ -69,7 +70,7 @@ void TrumaiNetBoxAppClock::create_update_data(StatusFrame *response, uint8_t *re
   response->clock.clock_second = now.second;
   response->clock.display_1 = 0x1;
   response->clock.display_2 = 0x1;
-  response->clock.clock_mode = this->data_.clock_mode;
+  response->clock.clock_mode = this->incoming_.clock_mode;
 
   status_frame_calculate_checksum(response);
   (*response_len) = sizeof(StatusFrameHeader) + sizeof(StatusFrameClock);
