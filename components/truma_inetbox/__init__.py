@@ -35,6 +35,8 @@ CONF_FAULT_PIN = "fault_pin"
 CONF_OBSERVER_MODE = "observer_mode"
 CONF_NUMBER_OF_CHILDREN = "number_of_children"
 CONF_ON_HEATER_MESSAGE = "on_heater_message"
+CONF_ON_LIN_EVENT = "on_lin_event"
+CONF_ON_LIN_FRAMES = "on_lin_frames"
 
 truma_inetbox_ns = cg.esphome_ns.namespace("truma_inetbox")
 StatusFrameHeater = truma_inetbox_ns.struct("StatusFrameHeater")
@@ -46,6 +48,10 @@ TrumaiNetBoxAppHeaterMessageTrigger = truma_inetbox_ns.class_(
     "TrumaiNetBoxAppHeaterMessageTrigger",
     automation.Trigger.template(StatusFrameHeaterConstPtr),
 )
+TrumaiNetBoxAppLinEventTrigger = truma_inetbox_ns.class_(
+    "TrumaiNetBoxAppLinEventTrigger", automation.Trigger.template(cg.std_string))
+TrumaiNetBoxAppLinFramesTrigger = truma_inetbox_ns.class_(
+    "TrumaiNetBoxAppLinFramesTrigger", automation.Trigger.template(cg.std_string))
 
 # `LIN_CHECKSUM` is a enum class and not a namespace but it works.
 LIN_CHECKSUM_dummy_ns = truma_inetbox_ns.namespace("LIN_CHECKSUM")
@@ -156,6 +162,12 @@ CONFIG_SCHEMA = cv.All(
                     cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(TrumaiNetBoxAppHeaterMessageTrigger),
                 }
             ),
+            cv.Optional(CONF_ON_LIN_EVENT): automation.validate_automation(
+                {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(TrumaiNetBoxAppLinEventTrigger)}
+            ),
+            cv.Optional(CONF_ON_LIN_FRAMES): automation.validate_automation(
+                {cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(TrumaiNetBoxAppLinFramesTrigger)}
+            ),
         }
     )
     # Polling is for presenting data to sensors.
@@ -197,6 +209,14 @@ async def to_code(config):
         await automation.build_automation(
             trigger, [(StatusFrameHeaterConstPtr, "message")], conf
         )
+
+    for conf in config.get(CONF_ON_LIN_EVENT, []):
+        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
+        await automation.build_automation(trigger, [(cg.std_string, "x")], conf)
+
+    for conf in config.get(CONF_ON_LIN_FRAMES, []):
+        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], var)
+        await automation.build_automation(trigger, [(cg.std_string, "x")], conf)
 
 
 # AUTOMATION

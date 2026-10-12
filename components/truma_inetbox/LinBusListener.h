@@ -1,8 +1,11 @@
 #pragma once
 
 #include "LinBusLog.h"
+#include "LinBusDiag.h"
 #include "esphome/core/component.h"
 #include "esphome/components/uart/uart.h"
+
+#include <atomic>
 
 #ifdef USE_ESP32
 #include <freertos/FreeRTOS.h>
@@ -44,7 +47,8 @@ class LinBusListener : public PollingComponent, public uart::UARTDevice {
   void set_lin_checksum(LIN_CHECKSUM val) { this->lin_checksum_ = val; }
   void set_cs_pin(GPIOPin *pin) { this->cs_pin_ = pin; }
   void set_fault_pin(GPIOPin *pin) { this->fault_pin_ = pin; }
-  void set_observer_mode(bool val) { this->observer_mode_ = val; }
+  void set_observer_mode(bool val) { this->observer_mode_.store(val, std::memory_order_relaxed); }
+  bool get_observer_mode() const { return this->observer_mode_.load(std::memory_order_relaxed); }
   bool get_lin_bus_fault() { return fault_on_lin_bus_reported_ > 3; }
 
   void process_lin_msg_queue(TickType_t xTicksToWait);
@@ -54,7 +58,8 @@ class LinBusListener : public PollingComponent, public uart::UARTDevice {
   LIN_CHECKSUM lin_checksum_ = LIN_CHECKSUM::LIN_CHECKSUM_VERSION_2;
   GPIOPin *cs_pin_ = nullptr;
   GPIOPin *fault_pin_ = nullptr;
-  bool observer_mode_ = false;
+  // Written by the main loop, read by the UART task and the LIN event task.
+  std::atomic<bool> observer_mode_{false};
 
   // Must only be called from uartEventTask_ — not ISR-safe, not main-loop-safe.
   void write_lin_answer_(const uint8_t *data, uint8_t len);
@@ -65,7 +70,19 @@ class LinBusListener : public PollingComponent, public uart::UARTDevice {
   // host-side test harnesses that feed bytes without an ESP32 UART.
   void onReceive_();
 
+  // Filled by the UART task (uartEventTask_), drained by the main loop. Copy-only: never blocks.
+  SpscRing<DiagFrame, 64> diag_frames_;
+  // LIN messages dropped because the LIN message queue was full. Counted by the UART task, taken by the main loop.
+  std::atomic<uint32_t> lin_msg_dropped_{0};
+
  private:
+  uint32_t diag_pid_us_ = 0;
+  uint32_t diag_echo_us_ = 0;
+  uint8_t diag_written_[9] = {};
+  uint8_t diag_written_len_ = 0;
+  bool diag_pushed_ = false;
+  void diag_push_frame_();
+
   // Microseconds per UART Baud
   uint32_t time_per_baud_;
   // LIN break = 13 bit times minimum (spec allows 9–15)
@@ -108,6 +125,8 @@ class LinBusListener : public PollingComponent, public uart::UARTDevice {
     this->current_data_valid = true;
     this->current_data_count_ = 0;
     memset(this->current_data_, 0, sizeof(this->current_data_));
+    this->diag_pushed_ = false;
+    this->diag_written_len_ = 0;
   };
   void read_lin_frame_();
   void clear_uart_buffer_();
