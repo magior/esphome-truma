@@ -36,7 +36,7 @@ void LinBusListener::dump_config() {
   LOG_PIN("  FAULT Pin: ", this->fault_pin_);
   LOG_UPDATE_INTERVAL(this);
   ESP_LOGCONFIG(TAG, "  LIN checksum Version: %d", this->lin_checksum_ == LIN_CHECKSUM::LIN_CHECKSUM_VERSION_1 ? 1 : 2);
-  ESP_LOGCONFIG(TAG, "  Observer mode: %s", YESNO(this->observer_mode_));
+  ESP_LOGCONFIG(TAG, "  Observer mode: %s", YESNO(this->get_observer_mode()));
   this->check_uart_settings(9600, 2, esphome::uart::UART_CONFIG_PARITY_NONE, 8);
 }
 
@@ -101,8 +101,11 @@ void LinBusListener::write_lin_answer_(const uint8_t *data, uint8_t len) {
   // Check when last byte was read from buffer and wait at least one baud time.
   // It is working when I answer quicker.
 
-  if (!this->observer_mode_) {
+  if (!this->get_observer_mode()) {
     this->current_PID_order_answered_ = true;
+    memcpy(this->diag_written_, data, len);
+    this->diag_written_[len] = data_CRC;
+    this->diag_written_len_ = len + 1;
     this->write_array(data, len);
     this->write(data_CRC);
   }
@@ -219,6 +222,8 @@ void LinBusListener::read_lin_frame_() {
         }
       }
 
+      this->diag_push_frame_();
+
       // Reset current state
       this->current_state_reset_();
 
@@ -247,6 +252,7 @@ void LinBusListener::read_lin_frame_() {
       }
       break;
     case READ_STATE_SID:
+      this->diag_pid_us_ = micros();
       this->read_byte(&(this->current_PID_with_parity_));
       this->current_PID_ = this->current_PID_with_parity_ & 0x3F;
       if (this->lin_checksum_ == LIN_CHECKSUM::LIN_CHECKSUM_VERSION_2) {
@@ -279,6 +285,9 @@ void LinBusListener::read_lin_frame_() {
       this->read_byte(&buf);
       this->current_data_[this->current_data_count_] = buf;
       this->current_data_count_++;
+      if (this->current_data_count_ == 1) {
+        this->diag_echo_us_ = micros();
+      }
 
       if (this->current_data_count_ >= sizeof(this->current_data_)) {
         // End of data reached. There cannot be more than 9 bytes in a LIN frame.
@@ -347,12 +356,14 @@ void LinBusListener::read_lin_frame_() {
         lin_msg.data[i] = this->current_data_[i];
       }
       if (xQueueSendFromISR(this->lin_msg_queue_, (void *) &lin_msg, nullptr) != pdPASS) {
-        // No logging on the UART task: report the drop through the log queue.
+        // No logging on the UART task: count the drop and report it through the log queue.
+        this->lin_msg_dropped_.fetch_add(1, std::memory_order_relaxed);
         log_msg.type = QUEUE_LOG_MSG_TYPE::WARN_READ_LIN_FRAME_MSG_QUEUE_FULL;
         log_msg.current_PID = this->current_PID_;
         TRUMA_LOGW_ISR(log_msg);
       }
     }
+    this->diag_push_frame_();
     this->current_state_ = READ_STATE_BREAK;
   }
 }
@@ -383,7 +394,7 @@ void LinBusListener::process_log_queue(TickType_t xTicksToWait) {
         ESP_LOGE(TAG, "LIN answer cannot be longer than 8 bytes.");
         break;
       case QUEUE_LOG_MSG_TYPE::VERBOSE_LIN_ANSWER_RESPONSE:
-        if (!this->observer_mode_) {
+        if (!this->get_observer_mode()) {
           ESP_LOGV(TAG, "RESPONSE %02X %s", current_PID, format_hex_pretty(log_msg.data, log_msg.len).c_str());
         } else {
           ESP_LOGV(TAG, "RESPONSE %02X %s - NOT SEND (OBSERVER MODE)", current_PID,
@@ -447,6 +458,28 @@ void LinBusListener::process_log_queue(TickType_t xTicksToWait) {
     }
   }
 #endif  // ESPHOME_LOG_LEVEL > ESPHOME_LOG_LEVEL_NONE
+}
+
+// UART task only. Copies the finished slot into the diagnostic ring; no allocation, no logging.
+void LinBusListener::diag_push_frame_() {
+  if (this->diag_pushed_ || this->current_PID_with_parity_ == 0x00) {
+    return;
+  }
+  this->diag_pushed_ = true;
+  DiagFrame frame{};
+  frame.t_us = this->diag_pid_us_;
+  frame.pid_byte = this->current_PID_with_parity_;
+  frame.len = std::min<uint8_t>(this->current_data_count_, sizeof(frame.data));
+  memcpy(frame.data, this->current_data_, frame.len);
+  frame.ours = this->current_PID_order_answered_;
+  if (frame.ours) {
+    // The first echo byte is complete one byte time after our transmission started.
+    const uint32_t byte_us = this->time_per_baud_ * frame_length_;
+    const uint32_t dt = this->diag_echo_us_ - this->diag_pid_us_;
+    frame.latency_us = (frame.len > 0 && dt > byte_us) ? (uint16_t) std::min<uint32_t>(dt - byte_us, 0xFFFF) : 0;
+    frame.echo_ok = frame.len == this->diag_written_len_ && memcmp(frame.data, this->diag_written_, frame.len) == 0;
+  }
+  this->diag_frames_.push(frame);
 }
 
 }  // namespace truma_inetbox
