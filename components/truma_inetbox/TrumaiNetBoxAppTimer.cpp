@@ -35,20 +35,21 @@ StatusFrameTimerResponse *TrumaiNetBoxAppTimer::update_prepare() {
 }
 
 void TrumaiNetBoxAppTimer::create_update_data(StatusFrame *response, uint8_t *response_len, uint8_t command_counter) {
+  std::lock_guard<std::mutex> guard(this->lock_);
   status_frame_create_empty(response, STATUS_FRAME_TIMER_RESPONSE, sizeof(StatusFrameTimerResponse), command_counter);
 
-  response->timerResponse.timer_target_temp_room = this->update_status_.timer_target_temp_room;
-  response->timerResponse.timer_heating_mode = this->update_status_.timer_heating_mode;
-  response->timerResponse.timer_target_temp_water = this->update_status_.timer_target_temp_water;
-  response->timerResponse.timer_energy_mix_a = this->update_status_.timer_energy_mix_a;
-  response->timerResponse.timer_energy_mix_b = this->update_status_.timer_energy_mix_b;
-  response->timerResponse.timer_el_power_level_a = this->update_status_.timer_el_power_level_a;
-  response->timerResponse.timer_el_power_level_b = this->update_status_.timer_el_power_level_b;
-  response->timerResponse.timer_resp_active = this->update_status_.timer_resp_active;
-  response->timerResponse.timer_resp_start_hours = this->update_status_.timer_resp_start_hours;
-  response->timerResponse.timer_resp_start_minutes = this->update_status_.timer_resp_start_minutes;
-  response->timerResponse.timer_resp_stop_hours = this->update_status_.timer_resp_stop_hours;
-  response->timerResponse.timer_resp_stop_minutes = this->update_status_.timer_resp_stop_minutes;
+  response->timerResponse.timer_target_temp_room = this->submitted_.timer_target_temp_room;
+  response->timerResponse.timer_heating_mode = this->submitted_.timer_heating_mode;
+  response->timerResponse.timer_target_temp_water = this->submitted_.timer_target_temp_water;
+  response->timerResponse.timer_energy_mix_a = this->submitted_.timer_energy_mix_a;
+  response->timerResponse.timer_energy_mix_b = this->submitted_.timer_energy_mix_b;
+  response->timerResponse.timer_el_power_level_a = this->submitted_.timer_el_power_level_a;
+  response->timerResponse.timer_el_power_level_b = this->submitted_.timer_el_power_level_b;
+  response->timerResponse.timer_resp_active = this->submitted_.timer_resp_active;
+  response->timerResponse.timer_resp_start_hours = this->submitted_.timer_resp_start_hours;
+  response->timerResponse.timer_resp_start_minutes = this->submitted_.timer_resp_start_minutes;
+  response->timerResponse.timer_resp_stop_hours = this->submitted_.timer_resp_stop_hours;
+  response->timerResponse.timer_resp_stop_minutes = this->submitted_.timer_resp_stop_minutes;
 
   status_frame_calculate_checksum(response);
   (*response_len) = sizeof(StatusFrameHeader) + sizeof(StatusFrameTimerResponse);
