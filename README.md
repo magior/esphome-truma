@@ -1,316 +1,339 @@
-> [!TIP]
-> ### ☕ Unterstützung
-> Wem die Weiterpflege dieses Forks hilft (neue Features, Fixes, Doku und Support laufen in meiner Freizeit), der darf mir gern einen Kaffee ausgeben:
-> **[paypal.me/rzaenger](https://paypal.me/rzaenger)** (kein Muss, ein Stern ⭐ freut genauso).
+> [!NOTE]
+> **This fork adds support for CP Plus panels with older firmware (C3.x, e.g. C3.00.00 / C3.00.01).**
+> With the upstream component such a panel only hands over its data and accepts commands while its display
+> is awake. The fix makes the box behave like the original Truma iNet Box; it is tested on a CP Plus
+> C3.00.00 with a Combi 6 Gas (H5.00.00). Everything else is
+> [havanti/esphome-truma](https://github.com/havanti/esphome-truma) 1.0.41. Why a separate fork:
+> [havanti/esphome-truma#29](https://github.com/havanti/esphome-truma/issues/29).
 
 <div align="center">
 
-# ESPHOME-TRUMA AND MORE
 
+# ESPHOME-TRUMA-HEATER AND MORE
 
-[![Release](https://img.shields.io/github/v/release/havanti/esphome-truma?style=flat-square&color=blue)](https://github.com/havanti/esphome-truma/releases) [![Stars](https://img.shields.io/github/stars/havanti/esphome-truma?style=flat-square&color=yellow)](https://github.com/havanti/esphome-truma) [![ESPHome](https://img.shields.io/badge/ESPHome-%E2%89%A52026.9.1-blue?style=flat-square)](https://esphome.io) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
+**Why freeze in campervan when ESP32 fix everything for you?**
 
-[Funktionen](#was-dieser-fork-ergänzt) • [Beispiele](#beispielkonfigurationen) • [Hardware](hardware/) • [Entkokung](#diesel-entkokung-bzw-rückstandsverbrennung) • [Aventa AC](#truma-aventa-gen-2--klimaanlage) • [Cooler](#truma-cooler-cxx--kühlbox) • [TPMS](#tpms--reifendrucküberwachung-via-bluetooth-proxy) • [Fehlersuche](TROUBLESHOOTING.md) • [Contributing](CONTRIBUTING.md)
+[![Release](https://img.shields.io/github/v/release/magior/esphome-truma?style=flat-square&color=blue)](https://github.com/magior/esphome-truma/releases) [![Stars](https://img.shields.io/github/stars/magior/esphome-truma?style=flat-square&color=yellow)](https://github.com/magior/esphome-truma) [![ESPHome](https://img.shields.io/badge/ESPHome-%E2%89%A52026.9.1-blue?style=flat-square)](https://esphome.io) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
 
-🇩🇪 Deutsch | [🇬🇧 English](README.en.md)
+[Features](#what-this-fork-adds) • [Examples](#example-configurations) • [Hardware](hardware/) • [De-coking](#diesel-de-coking--residue-combustion) • [Aventa AC](#truma-aventa-gen-2--air-conditioning) • [Cooler](#truma-cooler-cxx--cooling-box) • [TPMS](#tpms--tire-pressure-monitoring-via-bluetooth-proxy) • [Troubleshooting](TROUBLESHOOTING.en.md) • [Contributing](CONTRIBUTING.en.md)
 
-*Beiträge willkommen — bitte zuerst ein [Issue öffnen](../../issues), bevor du einen PR erstellst. Siehe [CONTRIBUTING.md](CONTRIBUTING.md).*
+*Contributions welcome — please [open an issue](../../issues) before submitting a PR. See [CONTRIBUTING.en.md](CONTRIBUTING.en.md).*
+
+*If this fork helps you, a star ⭐ helps other C3 owners find it.*
 
 </div>
 
-## Schnellstart
+## Why this matters: the iNet Box is gone
 
-1. **Hardware** → [Verdrahtung & Teileliste](hardware/README.md)
-2. **Variante wählen** → passende YAML aus der [Tabelle unten](#beispielkonfigurationen) (Gas/Diesel × ESP32/ESP32-S3)
-3. **`secrets.yaml` anlegen** → [Vorlage](#voraussetzungen)
-4. **Flashen** → `esphome run <config>.yaml`
-
-Minimalbeispiel für den schnellen Einstieg → [direkt hier](#minimalbeispiel)
-
-Probleme bei der Inbetriebnahme? → [Fehlersuche (TROUBLESHOOTING.md)](TROUBLESHOOTING.md)
-
----
-
-## Danksagungen
-
-Ein herzliches Dankeschön gilt **[Fabian Schmidt](https://github.com/Fabian-Schmidt)**, dessen herausragende Arbeit am originalen [esphome-truma_inetbox](https://github.com/Fabian-Schmidt/esphome-truma_inetbox)-Repository überhaupt erst alles möglich gemacht hat. Dieses Projekt ist ein Fork seiner Arbeit, und ohne sein Engagement und seine Fachkenntnis wäre nichts davon entstanden. Danke, Fabian!
-
-Dieses Projekt baut außerdem auf der Vorarbeit des [WomoLIN-Projekts](https://github.com/muccc/WomoLIN) und [Daniel Fetts inetbox.py](https://github.com/danielfett/inetbox.py) sowie [mc0110s inetbox2mqtt](https://github.com/mc0110/inetbox2mqtt) auf — ihre Protokollforschung, Log-Dateien und Dokumentation waren von unschätzbarem Wert.
+Truma stopped producing the iNet Box on 1 January 2023. The Truma iNet System app gets no more updates
+from 1 January 2027, and service and support for the app and the box end on 1 January 2028; the box runs
+all its remote functions over 2G, which is being switched off
+([Truma press release, 20 August 2026](https://www.truma.com/press-releases/thank-you-inet-box-welcome-to-inet-x/)).
+Its successor, iNet X, supports gas Combi heaters only from model year 2018 (Combi 6 from serial number
+CBG06EU-D29117134), and gas Combi heaters with the earlier serial number format (CB403, CBE403, CB603,
+CBE603) are not compatible at all, whatever their year
+([Truma iNet X compatibility list](https://www.truma.com/gb/compability-inet-x-system)). An older gas
+installation, such as a Combi 6 with heater H5 and a CP Plus C3, has no official way left to be controlled
+remotely. An ESP32 on the LIN bus takes over the role of the iNet Box.
 
 ---
 
-## Was dieser Fork ergänzt
+## Quick start
 
-Dieser Fork erweitert die ursprüngliche Komponente um mehrere praxiserprobte Funktionen, die im täglichen Betrieb in einem Wohnmobil mit einer Truma Combi 6DE und einem ESP32-S3-Board entwickelt wurden. Die vollständige, funktionsfähige Konfiguration findet sich in [`ESP32-S3_truma_6DE_Diesel_example.yaml`](ESP32-S3_truma_6DE_Diesel_example.yaml).
+1. **Hardware** → [wiring & parts list](hardware/README.en.md)
+2. **Pick a variant** → choose the right YAML from the [table below](#example-configurations) (gas/diesel × ESP32/ESP32-S3)
+3. **Create `secrets.yaml`** → [template](#prerequisites)
+4. **Flash** → `esphome run your-config.yaml`
 
-### Diesel-„Entkokung" bzw. Rückstandsverbrennung
+Minimal example for the fastest path → [jump there](#minimal-example)
 
-Wenn eine Truma Combi längere Zeit mit Diesel betrieben wird, können sich Rußablagerungen am bzw. im Brennervlies (Edelstahlsintermaterial) und am Glühstiftsieb ansammeln. Empfohlene Pflegemaßnahmen:
+Commissioning problems? → [Troubleshooting guide (TROUBLESHOOTING.en.md)](TROUBLESHOOTING.en.md)
 
-- Monatlichen Entkokungszyklus durchführen (durch diese Konfiguration automatisiert, siehe unten).
-- Möglichst hochwertigen Dieselkraftstoff verwenden oder einen cetanzahlerhöhenden Kraftstoffzusatz in den Tank geben — eine höhere Cetanzahl führt zu saubererer Verbrennung und reduziert Ablagerungen.
+---
 
-Das integrierte `script_diesel_decoking` automatisiert diesen Vorgang:
+## Acknowledgements
 
-1. Schaltet den Energiemix auf Diesel
-2. Stellt die Raumheizung für 45 Minuten auf 30 °C / HIGH-Modus ein
-3. Schaltet das Heizgerät anschließend ab
-4. Nach dem Abschalten startet die Truma Combi automatisch einen Nachglühvorgang des Glühstifts, um eventuelle Rückstände am Glühstiftsieb zu verglühen — dies geschieht unabhängig von der Entkokungsfunktion und ist ein normaler Bestandteil des internen Truma-Abschaltvorgangs
-5. (Türen und Fenster öffnen ;-) )
+This fork is based on **[Roland's (havanti) esphome-truma](https://github.com/havanti/esphome-truma)**, which keeps the component running with current ESPHome releases and added a hardened LIN layer, the Aventa air conditioning, the Truma Cooler and TPMS support. Almost everything in this repository is his work. Thank you, Roland!
 
-In Home Assistant werden zwei Schaltflächen bereitgestellt:
+A heartfelt thank you goes to **[Fabian Schmidt](https://github.com/Fabian-Schmidt)**, whose outstanding work on the original [esphome-truma_inetbox](https://github.com/Fabian-Schmidt/esphome-truma_inetbox) repository made all of this possible in the first place. Roland's project is a fork of his work, and without his dedication and expertise none of this would exist. Thank you, Fabian!
 
-| Schaltfläche | Funktion |
+This project also builds on the groundwork laid by the [WomoLIN project](https://github.com/muccc/WomoLIN) and [Daniel Fett's inetbox.py](https://github.com/danielfett/inetbox.py), as well as [mc0110's inetbox2mqtt](https://github.com/mc0110/inetbox2mqtt) — their protocol research, log files and documentation have been invaluable.
+
+---
+
+## What this fork adds
+
+This fork extends the original component with several real-world features developed during daily use in a motorhome with a Truma Combi 6DE and an ESP32-S3 board. The full working configuration is provided in [`ESP32-S3_truma_6DE_Diesel_example.yaml`](ESP32-S3_truma_6DE_Diesel_example.yaml).
+
+### Diesel "De-coking" / Residue Combustion
+
+When a Truma Combi is operated on diesel for extended periods, carbon deposits can build up on and in the burner fleece (sintered stainless steel) and on the glow plug screen. Recommended maintenance:
+
+- Run a monthly de-coking cycle (automated by this configuration, see below).
+- Use the highest quality diesel fuel available, or add a cetane-boosting additive to the tank — a higher cetane number leads to cleaner combustion and reduces deposit buildup.
+
+The built-in `script_diesel_decoking` automates this procedure:
+
+1. Switches the energy mix to Diesel
+2. Sets the room heater to 30 °C / HIGH mode for 45 minutes
+3. Shuts the heater off afterwards
+4. After shutdown, the Truma Combi automatically initiates a post-glow cycle of the glow plug to burn off any residues on the glow plug screen — this is handled internally by the Truma Combi itself and is unrelated to the de-coking script
+5. (open doors and windows ;-) )
+
+Two buttons are exposed in Home Assistant:
+
+| Button | Function |
 |---|---|
-| Start Diesel De-coking | Startet den 45-minütigen Entkokungszyklus |
-| Abort Diesel De-coking | Bricht den Zyklus ab und schaltet das Heizgerät aus |
+| Start Diesel De-coking | Starts the 45-minute de-coking cycle |
+| Abort Diesel De-coking | Aborts the cycle and turns off the heater |
 
-Ein Template-Sensor (Diesel De-coking Remaining Time, Einheit: min) zeigt die verbleibende Zeit an und ist im Home-Assistant-Dashboard sowie, falls eingeschaltet, in der Web-UI sichtbar.
+A template sensor (Diesel De-coking Remaining Time, unit: min) counts down the remaining time and is visible in the Home Assistant dashboard and, if enabled, in the web UI.
 
-### Truma Aventa Gen 2 — Klimaanlage
+### Truma Aventa Gen 2 — Air Conditioning
 
-<img src="img/Aventa.png" width="500" alt="Truma Aventa Gen 2 Klimaanlage">
+<img src="img/Aventa.png" width="300" alt="Truma Aventa Gen 2 air conditioner">
 
-Der ESP32 steuert die Truma Aventa Gen 2 Klimaanlage über denselben LIN-Bus wie die Heizung — kein zweites Gerät nötig. In Home Assistant erscheint eine vollständige Climate-Entität mit allen Betriebsmodi. Laut Rückmeldungen funktioniert das auch mit der Aventa der ersten Generation (Issue #26, #28).
+The ESP32 controls the Truma Aventa Gen 2 air conditioner over the same LIN bus as the heater — no second device required. A full climate entity with all operating modes appears in Home Assistant. According to user feedback this also works with the first generation Aventa (issue #26, #28).
 
-Unterstützte Modi:
+Supported modes:
 
-| HA-Modus | Aventa-Funktion |
+| HA mode | Aventa function |
 |---|---|
-| Off | Klimaanlage aus |
-| Cool | Kühlen |
-| Heat | Heizen |
-| Heat/Cool | Automatik (Heizen + Kühlen) |
-| Fan only | Nur Lüfter |
+| Off | Air conditioning off |
+| Cool | Cooling |
+| Heat | Heating |
+| Heat/Cool | Automatic (heating + cooling) |
+| Fan only | Fan only |
 
-Lüftergeschwindigkeiten: Low / Mid / High / Night / Auto
+Fan speeds: Low / Mid / High / Night / Auto
 
-Temperaturbereich: 16–31 °C, Schrittweite 1 °C
+Temperature range: 16–31 °C, step 1 °C
 
-Wird am CP Plus AUTO gewählt, meldet der CP Plus das in einem eigenen Frame (0x37). Der Aventa-Frame bleibt dabei auf Aus, deshalb zeigen die Klima-Entität und die Selects weiter „Off“. Ob AUTO am CP Plus läuft und mit welchem Soll, zeigen der Binärsensor `AIRCON_AUTO_ACTIVE` und der Sensor `AIRCON_AUTO_TARGET_TEMPERATURE`. Ausgewertet ist das anhand von Logs einer Aventa Compact Plus 2. Generation (Issue #28), nach dem Einschalten steht im Frame das Soll, nach dem Ausschalten 0, der Sensor zeigt dann „Unbekannt“. An dieser Aventa ist die Anzeige inzwischen bestätigt. Das Setzen von AUTO aus HA (1.0.40) lehnt der CP Plus ab, es ist seit 1.0.41 wieder entfernt.
+If AUTO is selected on the CP Plus, the CP Plus reports it in a separate frame (0x37). The Aventa frame stays on off, so the climate entity and the selects still show "Off". Whether AUTO is running on the CP Plus and with which target is shown by the binary sensor `AIRCON_AUTO_ACTIVE` and the sensor `AIRCON_AUTO_TARGET_TEMPERATURE`. This is based on logs of an Aventa Compact Plus 2nd Gen (issue #28), after switching on the frame holds the target, after switching off 0, and the sensor then shows "unknown". On this Aventa the display is confirmed by now. Setting AUTO from HA (1.0.40) is rejected by the CP Plus and was removed again in 1.0.41.
 
-Licht: Die Number `AIRCON_LIGHT` zeigt die Lichtstufe der Aventa (0 = aus, 1–5) und stellt sie ein, ausgewertet wird dafür Byte 6–7 des Aventa-Frames. Jeder Schreibbefehl an die Aventa schickt die zuletzt gemeldete Lichtstufe mit, bis 1.0.37 stand dort 0. Laut Rückmeldung aus Issue #28 funktioniert das Licht an einer Aventa der ersten Generation.
+Light: The number `AIRCON_LIGHT` shows the light level of the Aventa (0 = off, 1–5) and sets it, using bytes 6–7 of the Aventa frame. Every write command to the Aventa sends the last reported light level along, up to 1.0.37 there was 0. According to feedback in issue #28 the light works on a first generation Aventa.
 
-Beispielkonfiguration: [`ESP32-S3_truma_Aventa_example.yaml`](ESP32-S3_truma_Aventa_example.yaml)
+Example configuration: [`ESP32-S3_truma_Aventa_example.yaml`](ESP32-S3_truma_Aventa_example.yaml)
 
-### Truma Cooler C(XX) — Kühlbox
+### Truma Cooler C(XX) — Cooling Box
 
-Der Truma Cooler C(XX) wird über BLE direkt gesteuert — kein separates Gateway nötig. Die Komponente `truma_cooler` liegt parallel zu den anderen Komponenten in `components/` dieses Repos:
+The Truma Cooler C(XX) is controlled directly via BLE — no separate gateway needed. The `truma_cooler` component sits alongside the other components in `components/`:
 
 ```yaml
 external_components:
   - source:
       type: git
-      url: https://github.com/havanti/esphome-truma
+      url: https://github.com/magior/esphome-truma
       ref: main
     components: [truma_cooler]
     refresh: always
 ```
 
-Das Modell wird in der YAML gewählt:
+The model is selected in the YAML:
 
 ```yaml
 truma_cooler:
-  model: c44   # Standard: einzoniger C44
-  # model: c69 # zweizoniger C69
+  model: c44   # default: single-zone C44
+  # model: c69 # dual-zone C69
 ```
 
-> **Modelle:** Der **C44** (einzonig) ist vollständig unterstützt. Der zweizonige **C69** ist seit v1.0.21 dabei (`model: c69`) — beide Zonen mit eigener Solltemperatur und Ist-Temperatur, auf echter Hardware verifiziert (inkl. Kompressor-Status). Beim C69 ist die **Power global** (es gibt kein Ein/Aus je Zone): ein einzelner **Master-Schalter `power`** schaltet die ganze Box ein/aus, die Zonen-Climates sind **nur Kühlen** und setzen je Zone nur die Solltemperatur. **Turbo ist beim C69 nicht implementiert.** Am C44 ist Turbo seit v1.0.34 an echter Hardware geprüft. Weitere Modelle: siehe [**SNIFFING.md**](SNIFFING.md) und melde dein Modell per [Issue](../../issues/new/choose).
+> **Models:** The **C44** (single zone) is fully supported. The dual-zone **C69** is included since v1.0.21 (`model: c69`) — both zones with their own setpoint and interior temperature, verified on real hardware (including compressor status). On the C69 **power is global** (there is no per-zone on/off): a single **master `power` switch** turns the whole box on/off, and the zone climates are **cool-only**, setting just each zone's target temperature. **Turbo is not implemented on the C69.** On the C44, turbo has been checked on real hardware since v1.0.34. More models: see [**SNIFFING.en.md**](SNIFFING.en.md) and report your model via an [issue](../../issues/new/choose).
 
 #### Features
 
-- **Klimasteuerung** — Ein/Aus und Solltemperatur (−22 °C bis +10 °C) direkt aus Home Assistant oder dem optionalen Web-Portal
-- **Turbo-Schalter** — Turbo-Modus ein/ausschalten (Gerät muss eingeschaltet sein); wird beim Einschalten automatisch zurückgesetzt
-- **Innentemperatur** — gemessene Temperatur im Inneren der Kühlbox (mit Glättungsfilter)
-- **Umgebungstemperatur (nur C44)** — Wert aus Byte 11 der Statusmeldung, Bedeutung ungeklärt: An
-  einer ausgeschalteten C44 mit offenem Deckel bei 19 °C Raumtemperatur lag er bei etwa 4 °C. Nicht
-  als Außentemperatur verwenden.
-- **Kompressor-Status** — Anzeige ob der Kompressor gerade läuft
-- **Gerätestatus** — Anzeige ob die Kühlbox eingeschaltet ist
-- **BLE-Verbindungsstatus** — Anzeige der aktuellen BLE-Verbindung zum ESP
-- **OTA-Update** — kabellose Firmware-Updates direkt über WLAN
-- **Web-Portal (optional)** — lokale Oberfläche auf Port 80 (ESPHome Web Server v3), kein Home Assistant erforderlich; in den Beispielen ausgeschaltet, siehe [Webserver (optional)](#webserver-optional)
-- **ESP-Neustart** — Schaltfläche zum Neustarten des ESP aus Home Assistant
+- **Climate control** — On/Off and setpoint (−22 °C to +10 °C) directly from Home Assistant or the optional web portal
+- **Turbo switch** — toggle turbo mode (device must be on); automatically resets on power-up
+- **Interior temperature** — measured inside the cooling box (with smoothing filter)
+- **Ambient temperature (C44 only)** — value from byte 11 of the status message, meaning unclear: on
+  a C44 that was off with the lid open at 19 °C room temperature it read about 4 °C. Do not use it
+  as outside temperature.
+- **Compressor status** — indicates whether the compressor is currently running
+- **Device status** — indicates whether the cooler is powered on
+- **BLE connection status** — current BLE connection state to the ESP
+- **OTA update** — wireless firmware updates over WiFi
+- **Web portal (optional)** — local UI on port 80 (ESPHome Web Server v3), no Home Assistant required; off in the examples, see [Web server (optional)](#web-server-optional)
+- **ESP restart** — button to restart the ESP from Home Assistant
 
-#### Voraussetzungen
+#### Requirements
 
-- **Mikrocontroller** mit BLE — empfohlen: [ESP32-S3 DevKitC-1](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/hw-reference/esp32s3/user-guide-devkitc-1.html)
-- **Framework**: ESP-IDF (zwingend für BLE Secure Connections / Bonding — Arduino nicht unterstützt)
+- **Microcontroller** with BLE — recommended: [ESP32-S3 DevKitC-1](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/hw-reference/esp32s3/user-guide-devkitc-1.html)
+- **Framework**: ESP-IDF (mandatory for BLE Secure Connections / Bonding — Arduino is not supported)
 - **ESPHome** ≥ 2026.9.1
-- **MAC-Adresse** der Kühlbox — einmalig via nRF Connect oder Truma App (aus App danach entfernen: nur eine BT-Verbindung möglich)
+- **MAC address** of the cooler — look up once via nRF Connect or the Truma app (unpair from app afterwards: only one BT connection allowed)
 
-> **Empfehlung:** Wer ausschließlich den Truma Cooler ohne Heizung oder Klimaanlage betreibt, kann einen **M5Stack Atom Lite** als dedizierten ESP32 nutzen. Das Gerät ist kompakt, günstig und unterstützt ESP-IDF — ideal als eigenständiger BLE-Knoten nur für die Kühlbox. Der M5Stack Atom eignet sich gleichzeitig hervorragend als [ESPHome Bluetooth Proxy](https://esphome.io/components/bluetooth_proxy/), sodass weitere BLE-Geräte über Home Assistant erreichbar werden — ohne zusätzliche Hardware.
+> **Recommendation:** If you only have the Truma Cooler without a heater or air conditioner, consider running it on a dedicated **M5Stack Atom Lite**. It's compact, affordable, and supports ESP-IDF — a standalone BLE node just for the cooler. The M5Stack Atom also works excellently as an [ESPHome Bluetooth Proxy](https://esphome.io/components/bluetooth_proxy/), making additional BLE devices accessible via Home Assistant — no extra hardware needed.
 
-Vollständige Beispielkonfigurationen: [`ESP32_truma_cooler_example.yaml`](ESP32_truma_cooler_example.yaml) (C44) und [`ESP32_truma_cooler_C69_example.yaml`](ESP32_truma_cooler_C69_example.yaml) (C69).
+Complete example configurations: [`ESP32_truma_cooler_example.yaml`](ESP32_truma_cooler_example.yaml) (C44) and [`ESP32_truma_cooler_C69_example.yaml`](ESP32_truma_cooler_C69_example.yaml) (C69).
 
-### TPMS — Reifendrucküberwachung via Bluetooth Proxy
+### TPMS — Tire Pressure Monitoring via Bluetooth Proxy
 
-Der ESP32 fungiert gleichzeitig als Bluetooth Low Energy (BLE)-Empfänger für handelsübliche TPMS-Sensoren und macht ein separates Gateway überflüssig. Vier Sensoren werden gleichzeitig überwacht (FL, FR, RR, RL), jeder meldet:
+The ESP32 doubles as a Bluetooth Low Energy (BLE) receiver for aftermarket TPMS sensors, eliminating the need for a separate gateway. Four sensors are monitored simultaneously (FL, FR, RR, RL), each reporting:
 
-- Reifendruck in bar
-- Reifentemperatur in °C
-- Sensorakku-Spannung in V
+- Tire pressure in bar
+- Tire temperature in °C
+- Sensor battery voltage in V
 
-Die Integration nutzt `esp32_ble_tracker` mit passivem Scanning und wertet die herstellerspezifischen BLE-Advertisement-Nutzdaten direkt in einem C++-Lambda aus. Alle zwölf Sensor-Entitäten erscheinen automatisch in Home Assistant als Diagnose-Sensoren.
+The integration uses `esp32_ble_tracker` with passive scanning and parses the manufacturer-specific advertisement payload directly in a C++ lambda. All twelve sensor entities appear automatically in Home Assistant as diagnostic sensors.
 
-Um dies für eigene Sensoren anzupassen, sind die vier MAC-Adressen in den `on_ble_advertise`-Blöcken durch die eigenen TPMS-Sensor-Adressen zu ersetzen. Die Dekodierungslogik (Druckoffset, Skalierung) muss je nach Sensormarke gegebenenfalls angepasst werden.
+To adapt this for your own sensors, replace the four MAC addresses in the `on_ble_advertise` blocks with those of your TPMS sensors. The payload decoding logic (pressure offset, scaling) may need adjustment depending on your sensor brand.
 
-> Hinweis: BLE-Scanning und der Truma-LIN-Bus laufen parallel auf demselben Chip. Auf einem ESP32-S3 mit OctalSPI-PSRAM kann der BLE-Stack in den PSRAM ausgelagert werden, was das Risiko von Speicherkonflikten erheblich reduziert. Die mitgelieferten PSRAM-`sdkconfig_options` in `ESP32-S3_truma_6DE_Diesel_example.yaml` sind bereits entsprechend konfiguriert.
+> Note: BLE scanning and the Truma LIN bus operate in parallel on the same chip. On an ESP32-S3 with OctalSPI PSRAM the BLE stack can be offloaded to PSRAM, which significantly reduces the risk of memory conflicts. The provided PSRAM `sdkconfig_options` in `ESP32-S3_truma_6DE_Diesel_example.yaml` are already configured for this.
 
-> **Modulare TPMS-Variante:** [@kamahat](https://github.com/kamahat) hat die TPMS-Logik in eine eigenständige `tpms.yaml` + C++-Hilfsfunktion ausgelagert. Wer eine sauber getrennte Paketstruktur bevorzugt, findet diese Variante in seinem [Fork](https://github.com/kamahat/esphome-truma).
+> **Modular TPMS variant:** [@kamahat](https://github.com/kamahat) has extracted the TPMS logic into a standalone `tpms.yaml` package and a C++ helper function. If you prefer a cleanly separated package structure, check out his [fork](https://github.com/kamahat/esphome-truma).
 
-Beispielkonfiguration: [`ESP32-S3_truma_6DE_Diesel_example.yaml`](ESP32-S3_truma_6DE_Diesel_example.yaml)
+Example configuration: [`ESP32-S3_truma_6DE_Diesel_example.yaml`](ESP32-S3_truma_6DE_Diesel_example.yaml)
 
-### Onboard RGB-LED — visuelle Statusanzeige (ESP32-S3)
+### Onboard RGB LED — visual status indicator (ESP32-S3)
 
-Das [Waveshare ESP32-S3-DEV-KIT-N8R8](https://www.waveshare.com/wiki/ESP32-S3-DEV-KIT-N8R8) und viele weitere ESP32-S3-Entwicklerboards verfügen über eine integrierte WS2812-RGB-LED (GPIO38), die ohne zusätzliche Hardware als visuelle Statusanzeige für den LIN-Bus genutzt werden kann.
+The [Waveshare ESP32-S3-DEV-KIT-N8R8](https://www.waveshare.com/wiki/ESP32-S3-DEV-KIT-N8R8) and many other ESP32-S3 development boards include an onboard WS2812 RGB LED (GPIO38) that can be used as a visual status indicator for the LIN bus without any additional hardware.
 
-Die Beispielkonfiguration nutzt diese LED mit zwei Signalen:
+The example configuration drives this LED with two signals:
 
-| Signal | Bedeutung |
+| Signal | Meaning |
 |---|---|
-| Grün blinkt (alle 2 s, 500 ms) | CP Plus verbunden — LIN-Bus aktiv |
-| Blau blitzt (300 ms) | TX-Kommando an Heizung gesendet |
-| Aus | CP Plus nicht verbunden |
+| Green blink (every 2 s, 500 ms) | CP Plus connected — LIN bus active |
+| Blue flash (300 ms) | TX command sent to heater |
+| Off | CP Plus not connected |
 
-**Vorteile gegenüber einer reinen Home-Assistant-Anzeige:**
+**Advantages over a Home Assistant-only indicator:**
 
-- Sofortige visuelle Rückmeldung direkt am Gerät, ohne App oder Dashboard
-- Erkennbar ob der ESP überhaupt kommuniziert, bevor WiFi oder HA verfügbar ist
-- Hilfreich bei der Erstinbetriebnahme und Fehlersuche vor Ort
+- Immediate visual feedback directly on the device, without any app or dashboard
+- Shows whether the ESP is communicating at all, before WiFi or HA is available
+- Useful during initial setup and on-site troubleshooting
 
-**Hinweis zum 90-Sekunden-Timeout:** Der `CP_PLUS_CONNECTED`-Sensor meldet `false` erst 90 Sekunden nach dem letzten empfangenen LIN-Paket. Wird das CP Plus physisch getrennt, bleibt die LED daher noch bis zu 90 Sekunden grün — das ist das designierte Verhalten des LIN-Bus-Protokolls, das kurze Verbindungsunterbrechungen tolerieren soll.
+**Note on the 90-second timeout:** The `CP_PLUS_CONNECTED` sensor reports `false` only 90 seconds after the last received LIN packet. If the CP Plus is physically disconnected, the LED therefore stays green for up to 90 seconds — this is the intended behaviour of the LIN bus protocol, designed to tolerate brief connection interruptions.
 
-Die Implementierung verwendet zwei ESPHome-Globals (`led_color`, `led_ticks`) und ein 100-ms-Intervall als LED-Treiber, sodass andere Intervalle (Alive-Anzeige) und Switch-Aktionen (TX-Kommandos) die LED durch einfaches Setzen dieser Variablen ansteuern können.
+The implementation uses two ESPHome globals (`led_color`, `led_ticks`) and a 100 ms interval as LED driver, so that other intervals (alive indication) and switch actions (TX commands) can control the LED simply by setting these variables.
 
-### Feinabstimmung, Überwachung & Stabilität
+### Fine-tuning, Monitoring & Stability
 
-Die Beispielkonfiguration enthält eine Reihe produktionserprobter Einstellungen, die im Basisbeispiel nicht enthalten sind:
+The example configuration includes a number of production-hardened settings that are not part of the basic example:
 
-WiFi-Ausfallsicherheit — Ein 5-Minuten-Intervall prüft auf unterbrochene Verbindung und führt einen Soft-Reconnect durch (`wifi.disable` → Verzögerung → `wifi.enable`), ohne den ESP neu zu starten. `reboot_timeout` ist auf `0s` gesetzt, um unerwartete Neustarts während Heizzyklen zu verhindern.
+WiFi resilience — A 5-minute interval checks for lost connectivity and performs a soft reconnect (`wifi.disable` → delay → `wifi.enable`) without rebooting the ESP. `reboot_timeout` is set to `0s` to prevent unexpected reboots during heating cycles.
 
-WiFi-HF-Optimierung — Die Sendeleistung ist auf `17 dB` festgelegt und der Energiesparmodus auf `light` gesetzt, für eine zuverlässige Verbindung in einem Metallfahrzeugkörper.
+WiFi RF tuning — Output power is fixed at `17 dB` and power-save mode is set to `light` for a reliable connection in a metal vehicle body.
 
-Systemdiagnose — Folgende Sensoren sind in Home Assistant immer verfügbar:
+System diagnostics — The following sensors are always available in Home Assistant:
 
-| Sensor | Beschreibung |
+| Sensor | Description |
 |---|---|
-| TR ESP32 Temperature | Interne Chip-Temperatur |
-| TR WiFi Signal dB | Roh-RSSI in dBm (alle 60 s aktualisiert) |
-| TR WiFi Signal | RSSI auf 0–100 % abgebildet für einfaches Dashboarding |
-| Uptime Sensor | Zeit seit dem letzten Neustart |
+| TR ESP32 Temperature | Internal chip temperature |
+| TR WiFi Signal dB | Raw RSSI in dBm (updated every 60 s) |
+| TR WiFi Signal | RSSI mapped to 0–100 % for easy dashboarding |
+| Uptime Sensor | Time since last boot |
 
-Home-Assistant-Zeitsynchronisation — Die ESP-Uhr wird über die Home-Assistant-Zeitplattform synchron gehalten, was für das korrekte Funktionieren der Timer-Aktionen erforderlich ist.
+Home Assistant time sync — The ESP clock is kept in sync via the Home Assistant time platform, which is required for the timer actions to work correctly.
 
-Optionale Web-UI — Ein lokaler Webserver auf Port 80 (ESPHome Web Server v3) mit `include_internal: true` zeigt alle Entitäten einschließlich interner Diagnosedaten direkt im Browser, ohne Home Assistant. In den Beispielen ist er ausgeschaltet, zu den Risiken siehe [Webserver (optional)](#webserver-optional).
+Optional web UI — A local web server on port 80 (ESPHome Web Server v3) with `include_internal: true` shows all entities including internal diagnostics directly in the browser, without Home Assistant. It is off in the examples, for the risks see [Web server (optional)](#web-server-optional).
 
-Template-Schalter — Fertige Ein/Aus-Schalter für die Raumheizung, den Wasserboiler und den integrierten Timer sind enthalten, was die Automatisierung und Dashboard-Integration vereinfacht.
+Template switches — Ready-to-use on/off switches for the room heater, water heater, and the built-in timer are included, making automation and dashboard integration straightforward.
 
-Neustart-Schaltfläche — Eine Ein-Klick-ESP-Neustart-Schaltfläche ist in Home Assistant für die Fernwartung verfügbar.
+Restart button — A one-click ESP restart button is exposed in Home Assistant for remote maintenance.
 
-Busverkehr mitschneiden — esphome-truma liest den gesamten LIN-Bus mit, nicht nur die eigenen Frames. Wer sehen will, was das CP Plus sendet, etwa beim Umschalten der Umluft, hebt das Log-Level an:
+Capturing bus traffic — esphome-truma listens to the whole LIN bus, not just its own frames. To see what the CP Plus sends, for example when the recirculation fan is switched, raise the log level:
 
 ```yaml
 logger:
-  level: VERBOSE          # jeder empfangene Frame als "PID xx  <bytes>"
-  # level: VERY_VERBOSE   # zusätzlich die Transportframes 0x3C/0x3D zur Heizung
+  level: VERBOSE          # every received frame as "PID xx  <bytes>"
+  # level: VERY_VERBOSE   # also the 0x3C/0x3D transport frames to the heater
 
 truma_inetbox:
-  observer_mode: true     # nur mithören, nichts auf den Bus senden
+  observer_mode: true     # listen only, never transmit on the bus
 ```
 
-`observer_mode: true` passt, wenn schon eine echte iNet Box am Bus hängt und der ESP nicht dazwischenfunken soll. Die Lüfterstufe steht in `PID 07`, Byte 0: `01` ist Eco, `02` ist High (an einer Combi D6E mitgeschnitten; mehr als Eco/High gibt das CP Plus dort nicht aus). VERBOSE ist sehr gesprächig, also nur zum Messen einschalten.
+Use `observer_mode: true` when a real iNet box is already on the bus and the ESP must not interfere. The fan stage is in `PID 07`, byte 0: `01` is Eco, `02` is High (captured on a Combi D6E; the CP Plus emits nothing beyond Eco/High there). VERBOSE is very chatty, so turn it on only while measuring.
 
 ---
 
-## Beispielkonfigurationen
+## Example configurations
 
-Dieses Repository stellt vier gebrauchsfertige Beispielkonfigurationen für die Truma Combi-Heizgerätefamilie bereit.
-Alle verwenden das ESP-IDF-Framework und beziehen die Komponente direkt aus diesem Repository.
-Erfordert ESPHome >= 2026.9.1.
+This repository provides four ready-to-use example configurations for the Truma Combi heater family.
+All use the ESP-IDF framework and pull the component directly from this repository.
+Requires ESPHome >= 2026.9.1.
 
-**Unterstützte Modelle:**
+**Supported models:**
 
-| Modell          | Leistung        | Brennstoff         | Elektro (230 V) |
-| --------------- | --------------- | ------------------ | --------------- |
-| Combi 4         | ~4 kW           | Gas (Propan/Butan) | ❌              |
-| Combi 6         | ~6 kW           | Gas (Propan/Butan) | ❌              |
-| Combi 4E        | ~4 kW (+Hybrid) | Gas                | ✅              |
-| Combi 6E        | ~6 kW (+Hybrid) | Gas                | ✅              |
-| Combi Diesel 4  | ~4 kW           | Diesel             | ❌              |
-| Combi Diesel 6  | ~6 kW           | Diesel             | ❌              |
-| Combi Diesel 4E | ~4 kW (+Hybrid) | Diesel             | ✅              |
-| Combi Diesel 6E | ~6 kW (+Hybrid) | Diesel             | ✅              |
+| Model           | Output          | Fuel                 | Electric (230 V) |
+| --------------- | --------------- | -------------------- | ---------------- |
+| Combi 4         | ~4 kW           | Gas (propane/butane) | ❌               |
+| Combi 6         | ~6 kW           | Gas (propane/butane) | ❌               |
+| Combi 4E        | ~4 kW (+Hybrid) | Gas                  | ✅               |
+| Combi 6E        | ~6 kW (+Hybrid) | Gas                  | ✅               |
+| Combi Diesel 4  | ~4 kW           | Diesel               | ❌               |
+| Combi Diesel 6  | ~6 kW           | Diesel               | ❌               |
+| Combi Diesel 4E | ~4 kW (+Hybrid) | Diesel               | ✅               |
+| Combi Diesel 6E | ~6 kW (+Hybrid) | Diesel               | ✅               |
 
-> **Hinweis zur Kompatibilität:** Entwickelt und getestet mit einer Truma Combi 6DE (Baujahr 2018, Eberspächer-Brenner). Ob andere Modelle und insbesondere neuere Diesel-Generationen mit einem von Truma selbst entwickelten Brenner (ohne Eberspächer) ebenfalls kompatibel sind, ist nicht sichergestellt. Rückmeldungen dazu sind sehr willkommen — bitte ein [Issue](https://github.com/havanti/esphome-truma/issues) öffnen.
+> **Compatibility note:** Developed and tested with a Truma Combi 6DE (2018 model year, Eberspächer burner). Whether other models — in particular newer diesel generations with a burner developed by Truma themselves (without Eberspächer) — are also compatible has not been verified. Feedback on this is very welcome — please open an [issue](https://github.com/magior/esphome-truma/issues).
 
-### Hardware-Aufbau
+### Hardware Setup
 
-Für den vollständigen Hardware-Aufbau — Teileliste, Verdrahtungsplan, Schritt-für-Schritt-Anleitung und Fehlersuche:
+For wiring the ESP32-S3 with the TJA1020 LIN transceiver and the Truma connector:
 
-➜ **[hardware/README.md](hardware/README.md)**
+➜ **[hardware/README.en.md](hardware/README.en.md)** — Parts list, wiring diagram, pin assignment, installation order
 
 ---
 
-### Schritt 1: Energiemix-Variante wählen
+### Step 1: Choose the energy mix variant
 
-Je nach Fahrzeugausstattung die passende Variante wählen. Die **E-Varianten** (4E / 6E / DE) unterstützen zusätzlich Elektrobetrieb — die entsprechenden Entitäten (`HEATER_ELECTRICITY`, `ELECTRIC_POWER_LEVEL`) sind in beiden Beispielkonfigurationen bereits enthalten.
+Choose the variant that matches your vehicle. The **E variants** (4E / 6E / DE) additionally support electric operation — the relevant entities (`HEATER_ELECTRICITY`, `ELECTRIC_POWER_LEVEL`) are already included in both example configurations.
 
-| Variante | ESP32 | ESP32-S3 |
+| Variant | ESP32 | ESP32-S3 |
 |---|---|---|
 | **Gas** | [`ESP32_truma_4-6_Gas_example.yaml`](ESP32_truma_4-6_Gas_example.yaml) | [`ESP32-S3_truma_4-6_Gas_example.yaml`](ESP32-S3_truma_4-6_Gas_example.yaml) |
 | **Diesel** | [`ESP32_truma_6DE_Diesel_example.yaml`](ESP32_truma_6DE_Diesel_example.yaml) | [`ESP32-S3_truma_6DE_Diesel_example.yaml`](ESP32-S3_truma_6DE_Diesel_example.yaml) |
 
-Die Variante bestimmt, welche ESPHome-Entitäten aktiviert werden:
+The variant determines which ESPHome entities are enabled:
 
-| | Gas-Variante | Diesel-Variante |
+| | Gas variant | Diesel variant |
 |---|---|---|
-| Binary Sensor (Brennstoff) | `HEATER_GAS` | `HEATER_DIESEL` |
-| Energy-Mix-Select | `HEATER_ENERGY_MIX_GAS` | `HEATER_ENERGY_MIX_DIESEL` |
-| Diesel-„Entkokung" bzw. Rückstandsverbrennung (nur ESP32-S3) | nicht enthalten | enthalten |
+| Binary sensor (fuel) | `HEATER_GAS` | `HEATER_DIESEL` |
+| Energy mix select | `HEATER_ENERGY_MIX_GAS` | `HEATER_ENERGY_MIX_DIESEL` |
+| Diesel "de-coking" / residue combustion (ESP32-S3 only) | not included | included |
 
-> Hinweis: Nur **eine** Energy-Mix-Select-Entität pro Konfiguration verwenden — entweder Gas oder Diesel, nicht beide gleichzeitig.
+> Note: Use only **one** energy mix select entity per configuration — either gas or diesel, not both at the same time.
 
-### Schritt 2: Hardware-Variante wählen
+### Step 2: Choose the hardware variant
 
-| Merkmal | ESP32 | ESP32-S3 |
+| Feature | ESP32 | ESP32-S3 |
 |---|---|---|
-| Ziel-Chip | ESP32 (klassisch, Rev ≥ 3) | ESP32-S3 |
+| Target chip | ESP32 (classic, rev ≥ 3) | ESP32-S3 |
 | Board | `esp32dev` | `esp32-s3-devkitc-1` |
-| PSRAM | nicht verwendet | OctalSPI-PSRAM aktiviert (N16R8, 8 MB) |
-| BLE-Stack | im internen RAM | in PSRAM ausgelagert |
-| LIN UART TX-Pin | GPIO17 | GPIO18 (vermeidet PSRAM-Pin-Konflikt) |
-| LIN UART RX-Pin | GPIO16 | GPIO8 (vermeidet PSRAM-Pin-Konflikt) |
-| Mindest-Chip-Revision | optional (`CONFIG_ESP32_REV_MIN`, auskommentiert) | keine Einschränkung |
-| Onboard RGB-LED | nicht vorhanden | WS2812, GPIO38, LIN-Bus-Statusanzeige |
-| Diesel-„Entkokung" bzw. Rückstandsverbrennung | nicht enthalten | enthalten (nur Diesel-Variante) |
-| Log-Level | `DEBUG` | `DEBUG` |
+| PSRAM | not used | OctalSPI PSRAM enabled (N16R8, 8 MB) |
+| BLE stack | in internal RAM | offloaded to PSRAM |
+| LIN UART TX pin | GPIO17 | GPIO18 (avoids PSRAM pin conflict) |
+| LIN UART RX pin | GPIO16 | GPIO8 (avoids PSRAM pin conflict) |
+| Minimum chip revision | optional (`CONFIG_ESP32_REV_MIN`, commented out) | no restriction |
+| Onboard RGB LED | not available | WS2812, GPIO38, LIN bus status indicator |
+| Diesel "de-coking" / residue combustion | not included | included (diesel variant only) |
+| Log level | `DEBUG` | `DEBUG` |
 
-ESP32-Variante verwenden, wenn ein Standard-ESP32 (WROOM-32, DevKit usw.) ohne PSRAM vorhanden ist.
-Das Auskommentieren von `CONFIG_ESP32_REV_MIN: "3"` und `version: recommended` kann die Binärgröße bei älteren Toolchains reduzieren.
+Use the ESP32 variant if you have a standard ESP32 (WROOM-32, DevKit etc.) without PSRAM.
+Uncommenting `CONFIG_ESP32_REV_MIN: "3"` and `version: recommended` can reduce binary size on older toolchains.
 
-ESP32-S3-Variante verwenden, wenn ein ESP32-S3-Modul mit OctalSPI-PSRAM (z.B. N16R8) vorhanden ist.
-Die PSRAM-Konfiguration (OCT-Modus, 80 MHz) ist für diese Modulvariante erforderlich.
-Die UART-Pins wurden von GPIO16/17 wegverlegt, die auf S3-Boards für PSRAM reserviert sind.
+Use the ESP32-S3 variant if you have an ESP32-S3 module with OctalSPI PSRAM (e.g. N16R8).
+The PSRAM configuration (OCT mode, 80 MHz) is required for this module variant.
+The UART pins have been moved away from GPIO16/17, which are reserved for PSRAM on S3 boards.
 
-### Voraussetzungen
+### Prerequisites
 
-Alle Konfigurationen verwenden `secrets.yaml` für WLAN-Zugangsdaten und den `api`-Schlüssel. Eine `secrets.yaml` im gleichen Verzeichnis erstellen mit:
+All configurations use `secrets.yaml` for WiFi credentials and the `api` key. Create a
+`secrets.yaml` in the same directory with:
 
 ```yaml
-wifi_Mobile_ssid: "MobileSSID"
-wifi_Mobile_password: "MobilePasswort"
-wifi_Home_ssid: "HeimSSID"
-wifi_Home_password: "HeimPasswort"
-api_encryption_key: "32-Byte-Base64-Schlüssel"
+wifi_Mobile_ssid: "YourMobileSSID"
+wifi_Mobile_password: "YourMobilePassword"
+wifi_Home_ssid: "YourHomeSSID"
+wifi_Home_password: "YourHomePassword"
+api_encryption_key: "32-byte base64 key"
 ```
 
-Der `api`-Schlüssel muss ein 32-Byte-Base64-Schlüssel sein, zum Beispiel erzeugt mit
-`openssl rand -base64 32`. Ein leerer Schlüssel wird seit ESPHome 2026.9.0 abgelehnt.
+The `api` key must be a 32-byte base64 key, for example generated with `openssl rand -base64 32`.
+An empty key is rejected since ESPHome 2026.9.0.
 
 ### OTA (Over-the-Air Update)
 
-Alle Beispielkonfigurationen enthalten einen `ota`-Block, der Firmware-Updates direkt über WLAN ermöglicht — ohne den ESP32 physisch anschließen zu müssen:
+All example configurations include an `ota` block that allows firmware updates directly over Wi-Fi — without physically connecting the ESP32:
 
 ```yaml
 ota:
@@ -318,37 +341,34 @@ ota:
   encryption: {}
 ```
 
-`encryption: {}` verschlüsselt die Übertragung mit dem `api`-Schlüssel, ein eigenes OTA-Passwort
-ist nicht nötig. Den Schlüssel sicher aufbewahren: Wer ihn verliert, muss den ESP32 wieder per USB
-flashen.
+`encryption: {}` encrypts the upload with the `api` key, no separate OTA password is needed. Keep
+the key safe: if you lose it, you will need to flash the ESP32 via USB again.
 
-Läuft auf dem ESP32 noch eine Firmware, die mit OTA-Passwort gebaut wurde, bricht das Update mit
-`the device did not offer encryption` ab. Dann einmal mit dem bisherigen `password` statt
-`encryption: {}` installieren, der `api`-Schlüssel ist dabei schon gesetzt. Danach den
-`encryption`-Block wieder einfügen. Ist der `api`-Schlüssel neu, fragt Home Assistant ihn beim
-nächsten Verbinden ab.
+If the ESP32 still runs firmware built with an OTA password, the update aborts with
+`the device did not offer encryption`. Install once with the previous `password` instead of
+`encryption: {}`, with the `api` key already set. Then add the `encryption` block back. If the
+`api` key is new, Home Assistant asks for it on the next connection.
 
-### Webserver (optional)
+### Web server (optional)
 
-In den Beispielkonfigurationen ist der `web_server`-Block auskommentiert. Eingeschaltet stellt der
-ESP32 auf Port 80 eine eigene Weboberfläche bereit, über die sich alle Entitäten ohne Home Assistant
-anzeigen und schalten lassen. Mit `include_internal: true` erscheinen dort auch die internen
-Entitäten.
+The `web_server` block is commented out in the example configurations. When enabled, the ESP32
+serves its own web UI on port 80, where all entities can be viewed and switched without Home
+Assistant. With `include_internal: true` the internal entities show up there as well.
 
-Ohne `auth` ist diese Oberfläche nicht geschützt. Jeder im selben WLAN kann sie im Browser öffnen,
-Heizung, Klima oder Kühlbox schalten, Solltemperaturen ändern, den ESP neu starten und die Logs
-mitlesen. Im Wohnmobil ist das vor allem auf Campingplätzen oder in fremden WLANs ein Risiko. Der
-`api`-Schlüssel hilft dabei nicht, er sichert nur die Verbindung zu Home Assistant, die
-Weboberfläche läuft daneben unverschlüsselt über HTTP. Eine Firmware lässt sich über den Webserver
-nicht aufspielen, solange unter `ota` kein Eintrag `platform: web_server` steht.
+Without `auth` this UI is not protected. Anyone on the same Wi-Fi can open it in a browser, switch
+heater, air conditioning or cooler, change target temperatures, restart the ESP and read the logs.
+In a motorhome this is mainly a risk on campsites or in other foreign Wi-Fi networks. The `api` key
+does not help here, it only secures the connection to Home Assistant, the web UI runs next to it
+unencrypted over HTTP. Firmware cannot be uploaded through the web server as long as there is no
+`platform: web_server` entry under `ota`.
 
-Wer den Webserver nutzen will, sollte ihn mindestens mit Benutzername und Passwort absichern, dafür
-im Beispiel die `auth`-Zeilen mit einkommentieren und `web_username` und `web_password` in
-`secrets.yaml` eintragen. `type: digest` schickt das Passwort nicht im Klartext, die Seiten selbst
-bleiben aber unverschlüsselt. Den Webserver deshalb nur im eigenen Netz betreiben und Port 80 nicht
-über den Router nach außen freigeben. Wer ohnehin Home Assistant nutzt, braucht ihn nicht.
+If you want to use the web server, protect it at least with username and password: uncomment the
+`auth` lines in the example as well and add `web_username` and `web_password` to `secrets.yaml`.
+`type: digest` does not send the password in plain text, but the pages themselves stay unencrypted.
+So run the web server only in your own network and do not forward port 80 on the router. If you use
+Home Assistant anyway, you do not need it.
 
-### Minimalbeispiel
+### Minimal example
 
 ```yaml
 esphome:
@@ -357,7 +377,7 @@ esphome:
 external_components:
   - source:
       type: git
-      url: https://github.com/havanti/esphome-truma.git
+      url: https://github.com/magior/esphome-truma.git
     components: [truma_inetbox, uart]
     refresh: always
 
@@ -392,20 +412,20 @@ sensor:
     type: CURRENT_WATER_TEMPERATURE
 ```
 
-## ESPHome-Komponenten
+## ESPHome components
 
-Dieses Projekt enthält die folgenden ESPHome-Komponenten:
+This project contains the following ESPHome components:
 
-- `truma_inetbox` hat folgende Einstellungen:
-  - `cs_pin` (optional) wenn der Pin des LIN-Treiber-Chips verbunden ist.
-  - `fault_pin` (optional) wenn der Pin des LIN-Treiber-Chips verbunden ist.
-  - `on_heater_message` (optional) [ESPHome-Trigger](https://esphome.io/guides/automations.html) wenn eine Nachricht vom CP Plus empfangen wird.
+- `truma_inetbox` has the following settings:
+  - `cs_pin` (optional) if you connect the pin of your lin driver chip.
+  - `fault_pin` (optional) if you connect the pin of your lin driver chip.
+  - `on_heater_message` (optional) [ESPHome Trigger](https://esphome.io/guides/automations.html) when a message from CP Plus is recieved.
 
-Erfordert ESPHome 2026.9.1 oder höher.
+Requires ESPHome 2026.9.1 or higher.
 
-### Binary Sensor
+### Binary sensor
 
-Binary Sensors sind schreibgeschützt.
+Binary sensors are read-only.
 
 ```yaml
 binary_sensor:
@@ -414,7 +434,7 @@ binary_sensor:
     type: CP_PLUS_CONNECTED
 ```
 
-Folgende `type`-Werte sind verfügbar:
+The following `type` values are available:
 
 - `CP_PLUS_CONNECTED`
 - `HEATER_ROOM`
@@ -425,16 +445,16 @@ Folgende `type`-Werte sind verfügbar:
 - `HEATER_MIX_2`
 - `HEATER_ELECTRICITY`
 - `HEATER_HAS_ERROR`
-- `HEATING_DEMAND` (experimentell, siehe Sensor)
-- `HEATER_MAINS_POWER` — 230 V Landstrom an der Heizung (experimentell, nur Combi D, siehe Sensor)
+- `HEATING_DEMAND` (experimental, see Sensor)
+- `HEATER_MAINS_POWER` — 230 V shore power at the heater (experimental, Combi D only, see Sensor)
 - `TIMER_ACTIVE`
 - `TIMER_ROOM`
 - `TIMER_WATER`
-- `AIRCON_AUTO_ACTIVE` — AUTO am CP Plus gewählt (Aventa)
+- `AIRCON_AUTO_ACTIVE` — AUTO selected on the CP Plus (Aventa)
 
 ### Climate
 
-Climate-Komponenten unterstützen Lesen und Schreiben.
+Climate components support read and write.
 
 ```yaml
 climate:
@@ -446,7 +466,7 @@ climate:
     type: WATER
 ```
 
-Folgende `type`-Werte sind verfügbar:
+The following `type` values are available:
 
 - `ROOM`
 - `WATER`
@@ -454,7 +474,7 @@ Folgende `type`-Werte sind verfügbar:
 
 ### Number
 
-Number-Komponenten unterstützen Lesen und Schreiben.
+Number components support read and write.
 
 ```yaml
 number:
@@ -463,17 +483,17 @@ number:
     type: TARGET_ROOM_TEMPERATURE
 ```
 
-Folgende `type`-Werte sind verfügbar:
+The following `type` values are available:
 
 - `TARGET_ROOM_TEMPERATURE`
 - `TARGET_WATER_TEMPERATURE`
 - `ELECTRIC_POWER_LEVEL`
 - `AIRCON_MANUAL_TEMPERATURE`
-- `AIRCON_LIGHT` — Lichtstufe Aventa, 0 = aus, 1–5
+- `AIRCON_LIGHT` — Aventa light level, 0 = off, 1–5
 
 ### Select
 
-Select-Komponenten unterstützen Lesen und Schreiben.
+Select components support read and write.
 
 ```yaml
 select:
@@ -482,18 +502,18 @@ select:
     type: HEATER_FAN_MODE_COMBI
 ```
 
-Folgende `type`-Werte sind verfügbar:
+The following `type` values are available:
 
 - `HEATER_FAN_MODE_COMBI`
 - `HEATER_FAN_MODE_VARIO_HEAT`
 - `HEATER_ENERGY_MIX_GAS`
 - `HEATER_ENERGY_MIX_DIESEL`
-- `AIRCON_MODE` — Betriebsmodus Aventa (Off / Ventilation / Cooling / Heating / Auto)
-- `AIRCON_VENT_MODE` — Lüftergeschwindigkeit Aventa (Low / Mid / High / Night / Auto)
+- `AIRCON_MODE` — Aventa operating mode (Off / Ventilation / Cooling / Heating / Auto)
+- `AIRCON_VENT_MODE` — Aventa fan speed (Low / Mid / High / Night / Auto)
 
 ### Sensor
 
-Sensoren sind schreibgeschützt.
+Sensors are read-only.
 
 ```yaml
 sensor:
@@ -502,7 +522,7 @@ sensor:
     type: CURRENT_ROOM_TEMPERATURE
 ```
 
-Folgende `type`-Werte sind verfügbar:
+The following `type` values are available:
 
 - `CURRENT_ROOM_TEMPERATURE`
 - `CURRENT_WATER_TEMPERATURE`
@@ -513,53 +533,52 @@ Folgende `type`-Werte sind verfügbar:
 - `ENERGY_MIX`
 - `OPERATING_STATUS`
 - `HEATER_ERROR_CODE`
-- `PID22_BYTE0` (experimentell)
-- `PID22_BYTE1` (experimentell)
+- `PID22_BYTE0` (experimental)
+- `PID22_BYTE1` (experimental)
 - `VENT_MODE`
-- `AIRCON_AUTO_TARGET_TEMPERATURE` — AUTO-Soll vom CP Plus, „Unbekannt“ bei AUTO aus (Aventa)
+- `AIRCON_AUTO_TARGET_TEMPERATURE` — AUTO target from the CP Plus, "unknown" while AUTO is off (Aventa)
 
-`OPERATING_STATUS` gibt den Betriebszustand weiter, den die Heizung selbst meldet: 0 heißt aus,
-1 ist eine Warnung, 4 kommt beim Anlauf und beim Nachlauf. Die Werte darüber hängen vom Modell ab:
-Bei einer Combi 4 steht 5, sobald Heizung oder Boiler eingeschaltet sind, in Mitschnitten einer
-Combi D6E steht 7 bei eingestellter Heizung und 6 schon beim Einschalten ohne Heizung. Ob der
-Brenner gerade arbeitet, lässt sich daran nicht erkennen, die Komponente liefert dafür bisher kein
-Signal. Die Binärsensoren `HEATER_ROOM` und `HEATER_WATER` taugen dafür ebenfalls nicht, denn sie
-zeigen nur eine gesetzte Solltemperatur an und bleiben auch dann aktiv, wenn die Heizung ihre
-Temperatur erreicht hat und pausiert.
+`OPERATING_STATUS` passes on the operating state the heater itself reports: 0 means off, 1 is a
+warning, 4 shows up during start-up and cool-down. The values above that depend on the model: a
+Combi 4 reports 5 as soon as heating or boiler are switched on, while captures from a Combi D6E
+show 7 with heating set and 6 already at power-on without heating. They do not tell whether the
+burner is currently working, and the component provides no signal for that so far. The binary
+sensors `HEATER_ROOM` and `HEATER_WATER` are not suitable either, since they only indicate a
+target temperature being set and stay active while the heater has reached its temperature and
+pauses.
 
-In den Beispielkonfigurationen hat der Sensor die `id: operating_status`, damit er sich in Lambdas
-auswerten lässt.
+In the example configurations the sensor carries `id: operating_status` so it can be evaluated in
+lambdas.
 
-Experimentell und nur für die Combi 4: Die Sensoren `PID22_BYTE0` und `PID22_BYTE1` geben die
-ersten beiden Bytes des LIN-Frames mit der PID 0x22 als Rohwert aus, der Binärsensor
-`HEATING_DEMAND` wertet Bit 7 von Byte 1 aus. In Mitschnitten einer Combi D6E kommt dieser Frame
-nicht vor, dort bleiben die Entitäten ohne Wert. Bei Tests an einer Combi 4 Gas (Issue #25) stand
-Byte 1 auf 0xD0 (208), solange die Heizung heizen soll, auf 0x50 (80), sobald die Temperatur
-erreicht ist, und auf 0x00 bei ausgeschalteter Heizung. Das passt zum Blinken der Anzeige am
-CP Plus. Der Brenner zündet erst einige Sekunden nach dem Wechsel auf 0xD0 und geht mit dem
-Wechsel auf 0x50 aus. Im reinen Boilerbetrieb (Eco, Hot, Boost) wird Bit 7 nicht gesetzt, auch wenn
-der Brenner kurz für das Wasser läuft. `HEATING_DEMAND` zeigt also die Heizanforderung,
-nicht die Flamme. Byte 0 ist nach inetbox.py die Versorgungsspannung in 0,1 V (144 = 14,4 V), bei
-einem Vergleich im Fahrzeug stimmte das mit der Batteriespannung überein (13,8 zu 13,9 V), eine
-zweite Messung mit einem SmartShunt ebenfalls. Die Werte werden nur gemeldet, wenn sich eines der
-beiden Bytes ändert.
+Experimental and for the Combi 4 only: the sensors `PID22_BYTE0` and `PID22_BYTE1` expose the
+first two bytes of the LIN frame with PID 0x22 as raw values, and the binary sensor
+`HEATING_DEMAND` reads bit 7 of byte 1. Captures from a Combi D6E do not contain this frame, so
+the entities stay without a value there. In tests on a Combi 4 Gas (issue #25) byte 1 read 0xD0
+(208) while the heater is supposed to heat, 0x50 (80) once the temperature is reached, and 0x00
+with the heater switched off. This matches the blinking display on the CP Plus. In pure boiler
+operation (Eco, Hot, Boost) bit 7 is not set, even while the burner briefly runs for the water. The
+burner ignites a few seconds after the change to 0xD0 and goes out with the
+change to 0x50, so `HEATING_DEMAND` shows the heat demand, not the flame. According to inetbox.py,
+byte 0 is the supply voltage in 0.1 V (144 = 14.4 V); a comparison in a vehicle matched the battery
+voltage (13.8 vs. 13.9 V), and so did a second measurement with a SmartShunt. Values are only
+reported when one of the two bytes changes.
 
-`VENT_MODE` zeigt die Lüfterstufe an, die obere Ziffer von Byte 5 im LIN-Frame mit der PID 0x20:
-0 aus, 1 bis 10 Lüfterstufe im reinen Lüftungsbetrieb (Vent), 11 Heizlüfter Eco, 13 Heizlüfter
-High. Das deckt sich mit inetbox.py und wurde an einer Combi 4 nachgeprüft (Issue #25). Der Sensor
-ist eine reine Anzeige, die Lüftung lässt sich darüber nicht einstellen. Kommt der Frame auf dem
-Bus nicht vor, bleibt der Sensor ohne Wert. In den Mitschnitten einer Combi D6 E fehlen die PIDs
-0x20 bis 0x22 ganz. Eine weitere Auswertung dieser PIDs ist nicht geplant.
+`VENT_MODE` shows the fan level, the upper digit of byte 5 in the LIN frame with PID 0x20: 0 off,
+1 to 10 fan level in pure ventilation mode (Vent), 11 heating fan Eco, 13 heating fan High. This
+matches inetbox.py and was checked on a Combi 4 (issue #25). The sensor is display only; the
+ventilation cannot be set through it. If the frame does not appear on the bus, the sensor stays
+without a value. Captures from a Combi D6 E contain no PIDs 0x20 to 0x22 at all. No further
+analysis of these PIDs is planned.
 
-Experimentell und nur für die Combi D: Der Binärsensor `HEATER_MAINS_POWER` zeigt, ob an der
-Heizung 230 V Landstrom anliegen. Ausgewertet wird Bit 1 von Byte 1 im LIN-Frame 0x16, den die
-Combi D an den CP Plus schickt. Ohne Landstrom ist das Bit gelöscht, das Umschalten beim Einstecken
-ist aber noch nicht bestätigt. Für Automationen ist der Sensor deshalb noch nicht geeignet.
-Rückmeldungen mit einer Combi D gern als Issue.
+Experimental and for the Combi D only: the binary sensor `HEATER_MAINS_POWER` shows whether 230 V
+shore power is present at the heater. It evaluates bit 1 of byte 1 in LIN frame 0x16, which the
+Combi D sends to the CP Plus. Without shore power the bit is cleared, but the change when plugging
+in is not confirmed yet, so the sensor is not suitable for automations yet. Feedback from Combi D
+owners is welcome as an issue.
 
 ### Text Sensor
 
-Zeigt die installierte Komponentenversion im ESPHome-Webinterface und Home Assistant an.
+Exposes the installed component version in the ESPHome web interface and Home Assistant.
 
 ```yaml
 text_sensor:
@@ -567,38 +586,38 @@ text_sensor:
     name: "ESPHome Truma Version"
 ```
 
-Standardwerte: `entity_category: diagnostic`, `icon: mdi:tag`. Keine weiteren Parameter erforderlich.
+Defaults: `entity_category: diagnostic`, `icon: mdi:tag`. No further parameters required.
 
-### Aktionen
+### Actions
 
-Folgende [ESPHome-Aktionen](https://esphome.io/guides/automations.html#actions) sind verfügbar:
+The following [ESP Home actions](https://esphome.io/guides/automations.html#actions) are available:
 
 - `truma_inetbox.heater.set_target_room_temperature`
-  - `temperature` - Temperatur zwischen 5 °C und 30 °C. Unter 5 °C wird das Heizgerät deaktiviert.
-  - `heating_mode` - Optional: Heizmodus setzen: `"OFF"`, `ECO`, `HIGH`, `BOOST`.
+  - `temperature` - Temperature between 5 °C and 30 °C. Below 5 °C will disable the Heater.
+  - `heating_mode` - Optional set heating mode: `"OFF"`, `ECO`, `HIGH`, `BOOST`.
 - `truma_inetbox.heater.set_target_water_temperature`
-  - `temperature` - Wassertemperatur als Zahl: `0`, `40`, `60`, `80`.
+  - `temperature` - Set water temp as number: `0`, `40`, `60`, `80`.
 - `truma_inetbox.heater.set_target_water_temperature_enum`
-  - `temperature` - Wassertemperatur als Text: `"OFF"`, `ECO`, `HIGH`, `BOOST`.
+  - `temperature` - Set water temp as text: `"OFF"`, `ECO`, `HIGH`, `BOOST`.
 - `truma_inetbox.heater.set_electric_power_level`
-  - `watt` - Stromstufe setzen: `0`, `900`, `1800`.
+  - `watt` - Set electricity level to `0`, `900`, `1800`.
 - `truma_inetbox.heater.set_energy_mix`
-  - `energy_mix` - Energiemix setzen: `GAS`, `MIX`, `ELECTRICITY`.
-  - `watt` - Optional: Stromstufe setzen: `0`, `900`, `1800`.
+  - `energy_mix` - Set energy mix to: `GAS`, `MIX`, `ELECTRICITY`.
+  - `watt` - Optional: Set electricity level to `0`, `900`, `1800`
 - `truma_inetbox.aircon.manual.set_target_temperature`
-  - `temperature` - Temperatur zwischen 16 °C und 31 °C. Unter 16 °C wird die Klimaanlage deaktiviert.
-- `truma_inetbox.timer.disable` - Timer-Konfiguration deaktivieren.
-- `truma_inetbox.timer.activate` - Neue Timer-Konfiguration setzen.
-  - `start` - Startzeit.
-  - `stop` - Stoppzeit.
-  - `room_temperature` - Temperatur zwischen 5 °C und 30 °C.
-  - `heating_mode` - Optional: Heizmodus: `"OFF"`, `ECO`, `HIGH`, `BOOST`.
-  - `water_temperature` - Optional: Wassertemperatur als Zahl: `0`, `40`, `60`, `80`.
-  - `energy_mix` - Optional: Energiemix: `GAS`, `MIX`, `ELECTRICITY`.
-  - `watt` - Optional: Stromstufe: `0`, `900`, `1800`.
-- `truma_inetbox.clock.set` - CP Plus vom ESP aus aktualisieren. Es muss eine weitere [Zeitquelle](https://esphome.io/#time-components) konfiguriert sein, z.B. Home Assistant Time, GPS oder DS1307 RTC.
+  - `temperature` - Temperature between 16 °C and 31 °C. Below 16 °C will disable the Aircon.
+- `truma_inetbox.timer.disable` - Disable the timer configuration.
+- `truma_inetbox.timer.activate` - Set a new timer configuration.
+  - `start` - Start time.
+  - `stop` - Stop time.
+  - `room_temperature` - Temperature between 5 °C and 30 °C.
+  - `heating_mode` - Optional: Set heating mode: `"OFF"`, `ECO`, `HIGH`, `BOOST`.
+  - `water_temperature` - Optional: Set water temp as number: `0`, `40`, `60`, `80`.
+  - `energy_mix` - Optional: Set energy mix to: `GAS`, `MIX`, `ELECTRICITY`.
+  - `watt` - Optional: Set electricity level to `0`, `900`, `1800`.
+- `truma_inetbox.clock.set` - Update CP Plus from ESP Home. You *must* have another [clock source](https://esphome.io/#time-components) configured like Home Assistant Time, GPS or DS1307 RTC.
 
-**Truma-Uhr automatisch stellen (z. B. nach Stromausfall / herausgeflogener Sicherung):** Eine Zeitquelle als `time_id` im `truma_inetbox`-Block einhängen und `truma_inetbox.clock.set` per `on_time_sync` (direkt nach Boot/Reconnect) sowie optional stündlich aufrufen — so korrigiert sich die CP-Plus-Uhr von selbst, ohne manuelles Nachstellen:
+**Set the Truma clock automatically (e.g. after a power loss / blown fuse):** Wire a clock source as `time_id` into the `truma_inetbox` block and call `truma_inetbox.clock.set` via `on_time_sync` (right after boot/reconnect) and optionally hourly — the CP Plus clock then corrects itself without manual re-setting:
 
 ```yaml
 time:
@@ -610,7 +629,7 @@ time:
 
 truma_inetbox:
   uart_id: lin_uart_bus
-  time_id: homeassistant_time   # Zeitquelle für clock.set
+  time_id: homeassistant_time   # clock source for clock.set
 
 interval:
   - interval: 1h
@@ -618,24 +637,26 @@ interval:
       - truma_inetbox.clock.set:
 ```
 
-Statt Home Assistant Time funktioniert auch GPS oder eine DS1307-RTC als Zeitquelle. Die Beispiel-Konfigurationen enthalten diese Einrichtung bereits.
+GPS or a DS1307 RTC also work as a clock source instead of Home Assistant Time. The example configurations already include this setup.
 
-## Feedback & Tests
+## Feedback & Testing
 
-Wer diese Komponente ausprobiert, dessen Feedback ist sehr willkommen!
+If you give this component a try, your feedback is very welcome!
 
-Bitte mit dem eigenen Setup testen und mitteilen, wie es läuft — ob alles reibungslos funktioniert oder Probleme auftreten. Einfach ein [Issue](https://github.com/havanti/esphome-truma/issues) mit den Ergebnissen, Fehlerberichten oder Verbesserungsvorschlägen öffnen. Jeder Bericht hilft, dieses Projekt für alle besser zu machen.
+Please test it with your setup and let us know how it goes — whether everything works smoothly
+or you run into any issues. Feel free to open an [issue](https://github.com/magior/esphome-truma/issues) with your findings,
+bug reports, or suggestions for improvement. Every report helps make this project better for everyone.
 
 ---
 
-## Markenhinweis
+## Trademark Notice
 
-TRUMA ist eine eingetragene Marke der Truma Gerätetechnik GmbH & Co. KG mit Sitz in Putzbrunn. Dieses Projekt ist eine unabhängige, von der Community getriebene Open-Source-Initiative und steht in keiner Verbindung zur Truma Gerätetechnik GmbH & Co. KG, wird von ihr weder empfohlen noch unterstützt. Die Verwendung des Namens „Truma" in diesem Repository dient ausschließlich der technischen Identifikation und Kompatibilitätsbeschreibung.
+TRUMA is a registered trademark owned by Truma Gerätetechnik GmbH & Co. KG, a Putzbrunn-based entity. This project is an independent, community-driven open-source effort and is neither affiliated with, endorsed by, nor supported by Truma Gerätetechnik GmbH & Co. KG. The use of the name "Truma" in this repository is solely for the purpose of technical identification and compatibility description.
 
-## Haftungsausschluss
+## Disclaimer
 
-Die Nutzung dieses Projekts erfolgt vollständig freiwillig und auf eigene Gefahr.
+Use of this project is entirely voluntary and at your own risk.
 
-Diese Software wird „wie besehen" ohne jegliche ausdrückliche oder stillschweigende Gewährleistung bereitgestellt. Die Autor(en) übernehmen keinerlei Haftung für Schäden an Personen, Eigentum, Fahrzeugen, Heizgeräten oder sonstigen Vermögenswerten, die durch die Nutzung, missbräuchliche Verwendung oder Nichtnutzbarkeit dieser Software oder der hierin enthaltenen Konfigurationen entstehen. Dies schließt unter anderem Schäden ein, die auf fehlerhafte Konfiguration, unerwartetes Geräteverhalten, Software-Fehler oder Hardware-Ausfälle zurückzuführen sind.
+This software is provided "as is", without warranty of any kind, express or implied. The author(s) accept no liability whatsoever for any damage to persons, property, vehicles, heating appliances, or any other assets arising from the use, misuse, or inability to use this software or the configurations provided herein. This includes, but is not limited to, damage resulting from incorrect configuration, unexpected device behaviour, software bugs, or hardware failure.
 
-Vor der Nutzung einer Automatisierung, die ein Gas- oder Dieselheizgerät steuert, ist sicherzustellen, dass das betreffende Gerät vollständig verstanden wird und alle geltenden Sicherheitsvorschriften eingehalten werden. Neue Konfigurationen immer unter Aufsicht testen.
+Before using any automation that controls a gas or diesel heater, ensure you understand the operation of your specific device and comply with all applicable safety regulations. Always test new configurations under supervised conditions.

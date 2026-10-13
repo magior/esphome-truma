@@ -143,7 +143,7 @@ The converter steps the 12V supply down to the 5V required by the ESP32-S3.
 ## ESPHome Configuration
 
 The matching example YAMLs are available in the repository:
-**[github.com/havanti/esphome-truma](https://github.com/havanti/esphome-truma)**
+**[github.com/magior/esphome-truma](https://github.com/magior/esphome-truma)**
 
 Choose the variant matching your ESP32-S3:
 

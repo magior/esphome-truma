@@ -1,387 +1,417 @@
 # Changelog
 
-🇩🇪 Deutsch | [🇬🇧 English](CHANGELOG.en.md)
+All notable changes to this project will be documented in this file. Entries up to 1.0.41 come from
+[havanti/esphome-truma](https://github.com/havanti/esphome-truma), on which this fork is based; issue
+numbers in them refer to that repository.
 
-Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
-
-Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## Kompatibilitätsstatus
+## Compatibility Status
 
-### Zusammenfassung
+### Summary
 
-Das Setzen von AUTO aus HA (1.0.40) lehnt der CP Plus ab, es ist wieder entfernt. Der
-Landstrom-Sensor der Combi D aus 1.0.39 ist noch nicht bestätigt. AUTO-Anzeige und Licht der Aventa
-sind bestätigt (Issue #28).
+1.0.41+c3.1 adds support for CP Plus panels with older firmware (C3.x), tested on a CP Plus C3.00.00
+with a Combi 6 Gas (H5.00.00). Everything else is havanti/esphome-truma 1.0.41.
 
-Getestet mit:
+Upstream 1.0.41: setting AUTO from HA (1.0.40) is rejected by the CP Plus and was removed again. The shore
+power sensor of the Combi D from 1.0.39 is not confirmed yet. AUTO display and light of the Aventa are
+confirmed (issue #28).
+
+Tested against:
 - ESPHome **2026.9.1** — ESP-IDF ✅
 
 ---
 
 
-## [1.0.41] — 2026-10-09 — Aventa: AUTO aus HA wieder entfernt
+## [1.0.41+c3.1] — 2026-10-13 — CP Plus C3 support
 
-### Entfernt
-- `truma_inetbox`: Klima-Entität `AIRCON_AUTO` und Number `AIRCON_AUTO_TEMPERATURE` aus 1.0.40. Der
-  CP Plus lehnt den Befehl ab (Issue #28). Wer sie in der YAML hat, muss sie dort löschen, die
-  AUTO-Anzeige bleibt.
+Based on havanti/esphome-truma 1.0.41.
 
-### Dokumentation
-- README und Aventa-Beispiel angepasst.
+### Fixed
+- `truma_inetbox`: with a CP Plus on older firmware (C3.x) the init data and the commands from HA now also
+  go through while the panel is asleep, not only while its display is awake. The update flag on frame
+  0x18 (`FF`) stays set until the CP Plus reads BA, as the original iNet Box does; the init retry is 20 s
+  instead of 5 s and only fires when the device list does not arrive.
+- `truma_inetbox`: `HEATER_HAS_ERROR` checks both error code bytes. E212 arrives as low 0xD4, high 0x00
+  and left the indicator off.
+- `truma_inetbox`: the fan-mode select sends eco/high to a Combi that reports device 0x05 (named
+  `CPPLUS_VARIO`), instead of the Vario Heat modes night/auto.
+- `truma_inetbox`: a pending LIN answer is dropped when the master addresses another node, so a late
+  answer no longer collides with that node's response.
 
-## [1.0.40] — 2026-10-09 — Aventa: AUTO aus HA setzen (experimentell)
+### Changed
+- `truma_inetbox`: Read-by-Identifier answers and uploads as the original iNet Box: product id with
+  variant 0x00, id 0x20 → `02 02 00` (the panel lists the box as T2.02.00), id 0x22 → `03 07 00`;
+  uploads always transfer the full 40-byte buffer.
+- `truma_inetbox`: the clock write is refused on a CP Plus C3, which ignores it and then stops serving the
+  box. The C3 never sends a clock status, so the clock was not written to it before either.
+- Component version `1.0.41+c3.1`.
 
-### Hinzugefügt
-- `truma_inetbox`: Klima-Entität `AIRCON_AUTO` und Number `AIRCON_AUTO_TEMPERATURE` schalten AUTO am
-  CP Plus ein und aus und setzen das Soll. Vom CP Plus abgelehnt (Issue #28), in 1.0.41 entfernt.
+### Documentation
+- Documentation updated for the fork.
 
-### Dokumentation
-- README und Aventa-Beispiel um AUTO aus HA ergänzt, die Entitäten sind im Beispiel auskommentiert.
+## [1.0.41] — 2026-10-09 — Aventa: AUTO from HA removed again
 
-## [1.0.39] — 2026-10-07 — Combi D: Landstrom an der Heizung (experimentell)
+### Removed
+- `truma_inetbox`: climate entity `AIRCON_AUTO` and number `AIRCON_AUTO_TEMPERATURE` from 1.0.40. The
+  CP Plus rejects the command (issue #28). Please delete these entries from your YAML, the AUTO
+  display stays.
 
-### Hinzugefügt
-- `truma_inetbox`: Binärsensor `HEATER_MAINS_POWER` (nur Combi D) für 230 V Landstrom an der
-  Heizung. Experimentell und für Automationen noch nicht geeignet, das Umschalten beim Einstecken
-  ist noch nicht bestätigt.
+### Documentation
+- README and Aventa example updated.
 
-### Geändert
-- `truma_inetbox`: `AIRCON_AUTO_TARGET_TEMPERATURE` zeigt bei AUTO aus „Unbekannt“ statt 0 °C.
-  Bestätigt an einer Aventa Compact Plus 2nd Gen (Issue #28).
+## [1.0.40] — 2026-10-09 — Aventa: set AUTO from HA (experimental)
 
-### Dokumentation
-- README: `HEATER_MAINS_POWER` und das Mitschneiden des Busverkehrs beschrieben.
+### Added
+- `truma_inetbox`: climate entity `AIRCON_AUTO` and number `AIRCON_AUTO_TEMPERATURE` switch AUTO on
+  the CP Plus on and off and set the target. Rejected by the CP Plus (issue #28), removed in 1.0.41.
 
-## [1.0.38] — 2026-10-03 — Aventa: Licht und AUTO vom CP Plus
+### Documentation
+- README and Aventa example extended with AUTO from HA, the entities are commented out in the example.
 
-### Hinzugefügt
-- `truma_inetbox`: Number `AIRCON_LIGHT` für das Licht der Aventa (0 = aus, 1–5). Laut Rückmeldung
-  funktioniert das an einer Aventa der ersten Generation (Issue #28).
-- `truma_inetbox`: Binärsensor `AIRCON_AUTO_ACTIVE` und Sensor `AIRCON_AUTO_TARGET_TEMPERATURE`
-  zeigen AUTO am CP Plus an. Bestätigt an einer Aventa Compact Plus 2nd Gen (Issue #28).
+## [1.0.39] — 2026-10-07 — Combi D: shore power at the heater (experimental)
 
-### Behoben
-- `truma_inetbox`: Befehle an die Aventa aus HA lassen das Licht unverändert, bisher wurde es dabei
-  vermutlich ausgeschaltet. Laut Rückmeldung an einer Aventa der ersten Generation bestätigt.
+### Added
+- `truma_inetbox`: binary sensor `HEATER_MAINS_POWER` (Combi D only) for 230 V shore power at the
+  heater. Experimental and not suitable for automations yet, the change when plugging in is not
+  confirmed yet.
 
-### Dokumentation
-- README: Aventa-Abschnitt und Aventa-Beispiel um Licht und AUTO ergänzt.
+### Changed
+- `truma_inetbox`: `AIRCON_AUTO_TARGET_TEMPERATURE` shows "unknown" instead of 0 °C while AUTO is
+  off. Confirmed on an Aventa Compact Plus 2nd Gen (issue #28).
 
-## [1.0.37] — 2026-09-30 — Code aufgeräumt
+### Documentation
+- README: `HEATER_MAINS_POWER` and capturing bus traffic described.
 
-### Geändert
-- `truma_inetbox`, `uart`: Code aufgeräumt, am Verhalten ändert sich nichts. Läuft seit 1.0.38 an
-  einem CP Plus mit Aventa (Issue #28).
+## [1.0.38] — 2026-10-03 — Aventa: light and AUTO from the CP Plus
 
-## [1.0.36] — 2026-09-30 — Webserver optional
+### Added
+- `truma_inetbox`: Number `AIRCON_LIGHT` for the Aventa light (0 = off, 1–5). According to feedback
+  this works on a first generation Aventa (issue #28).
+- `truma_inetbox`: Binary sensor `AIRCON_AUTO_ACTIVE` and sensor `AIRCON_AUTO_TARGET_TEMPERATURE`
+  show AUTO on the CP Plus. Confirmed on an Aventa Compact Plus 2nd Gen (issue #28).
 
-### Geändert
-- Beispiel-YAMLs: Der Webserver ist auskommentiert und optional. Ohne Anmeldung konnte ihn jeder im
-  selben WLAN nutzen, das Beispiel enthält jetzt eine Anmeldung über `secrets.yaml`.
+### Fixed
+- `truma_inetbox`: Aventa commands from HA leave the light unchanged, before it was presumably
+  switched off. Confirmed according to feedback on a first generation Aventa.
 
-### Dokumentation
-- README: neuer Abschnitt „Webserver (optional)“.
+### Documentation
+- README: Aventa section and Aventa example extended with light and AUTO.
 
-## [1.0.35] — 2026-09-29 — Warmwasser bei Aventa-Befehlen
+## [1.0.37] — 2026-09-30 — Code cleanup
 
-### Behoben
-- `truma_inetbox`: Befehle an die Aventa aus HA schalten das Warmwasser nicht mehr ab (Issue #16,
-  #28). Bestätigt an einer Aventa Compact Plus 2nd Gen.
+### Changed
+- `truma_inetbox`, `uart`: Code cleanup, no change in behavior. Runs since 1.0.38 on a CP Plus with
+  an Aventa (issue #28).
 
-### Dokumentation
-- README: Hinweis, dass AUTO am CP Plus nicht ausgewertet wird.
+## [1.0.36] — 2026-09-30 — Web server optional
 
-## [1.0.34] — 2026-09-29 — Kühlbox-Korrekturen, Absicherung der LIN-Kommunikation
+### Changed
+- Example YAMLs: The web server is commented out and optional. Without login anyone on the same
+  Wi-Fi could use it, the example now contains a login from `secrets.yaml`.
 
-### Geändert
-- `truma_cooler`: Die Anmeldung für Statusmeldungen läuft über ESPHome statt über eigenen Code.
-- `truma_inetbox`: Antworten an den CP Plus sind gegen gleichzeitigen Zugriff abgesichert. Selten
-  waren vorher eine fehlerhafte Antwort oder ein Absturz möglich.
-- `truma_inetbox`: Der LIN-Empfang rechnet seine Wartezeit auch beim Zählerüberlauf (etwa alle
-  71 Minuten) richtig.
-- `truma_inetbox`, `uart`: Fehler bei der UART-Einrichtung erscheinen zuverlässig im Log.
+### Documentation
+- README: new section "Web server (optional)".
 
-### Behoben
-- `truma_cooler`: Erneutes „Kühlen“ an eine laufende Box schaltet beim C44 den Turbo nicht mehr ab.
-- `truma_cooler`: Der Turbo-Schalter bleibt aus, wenn er bei ausgeschalteter Box betätigt wird.
-- `truma_cooler`: Ein C44 mit Turbo wird als Turbo angezeigt, vorher standen Kompressor und Turbo
-  auf aus.
-- `truma_cooler`: Änderungen nach einem Befehl kommen nach etwa einer Sekunde in Home Assistant an
-  statt nach bis zu einer Minute.
+## [1.0.35] — 2026-09-29 — Water heater on Aventa commands
 
-## [1.0.33] — 2026-09-28 — Aventa einschalten
+### Fixed
+- `truma_inetbox`: Aventa commands from HA no longer switch off the water heater (issue #16, #28).
+  Confirmed on an Aventa Compact Plus 2nd Gen.
 
-### Behoben
-- `truma_inetbox`: Die Aventa lässt sich aus HA jetzt auch mit dem CP Plus C.04.05.02 einschalten,
-  der den Befehl bisher abgelehnt hat (Issue #28). Bestätigt an einer Aventa Compact Plus 2nd Gen.
+### Documentation
+- README: note that AUTO selected on the CP Plus is not evaluated.
 
-### Dokumentation
-- README: Hinweis, dass `VENT_MODE` an der Combi D6 E keine Werte liefert.
+## [1.0.34] — 2026-09-29 — Cooler fixes, LIN communication hardening
 
-## [1.0.32] — 2026-09-24 — Lüfterstufe
+### Changed
+- `truma_cooler`: Registering for status notifications goes through ESPHome instead of own code.
+- `truma_inetbox`: Answers to the CP Plus are protected against concurrent access. Before, a
+  corrupted answer or a crash was rarely possible.
+- `truma_inetbox`: LIN reception calculates its timeout correctly also when the counter rolls over
+  (about every 71 minutes).
+- `truma_inetbox`, `uart`: UART setup failures now reliably show up in the log.
 
-### Hinzugefügt
-- `truma_inetbox`: Sensor `VENT_MODE` zeigt die Lüfterstufe (0 aus, 1–10, 11 Heizlüfter Eco, 13
-  Heizlüfter High). Nur Anzeige, an einer Combi 4 nachgeprüft (Issue #25).
+### Fixed
+- `truma_cooler`: Sending "cool" again to a running box no longer switches off the turbo on a C44.
+- `truma_cooler`: The turbo switch stays off when used while the box is off.
+- `truma_cooler`: A C44 running turbo is shown as turbo, before compressor and turbo showed as off.
+- `truma_cooler`: Changes after a command reach Home Assistant after about one second instead of up
+  to a minute.
 
-### Dokumentation
-- README: `HEATING_DEMAND` bleibt im reinen Boilerbetrieb aus.
-- README: `PID22_BYTE0` ist die Versorgungsspannung, durch eine zweite Messung bestätigt.
+## [1.0.33] — 2026-09-28 — Switching on the Aventa
 
-## [1.0.31] — 2026-09-23 — Beispielkonfigurationen für ESPHome 2026.9.0
+### Fixed
+- `truma_inetbox`: The Aventa can now be switched on from HA also with CP Plus C.04.05.02, which
+  rejected the command before (issue #28). Confirmed on an Aventa Compact Plus 2nd Gen.
 
-### Geändert
-- Beispiel-YAMLs: Der API-Schlüssel kommt aus `!secret api_encryption_key`, ESPHome 2026.9.0 lehnt
-  den leeren Schlüssel ab.
-- Beispiel-YAMLs: OTA nutzt die API-Verschlüsselung statt eines Passworts. Umstieg siehe README,
-  Abschnitt OTA.
-- Beispiel-YAMLs: Kürzeres BLE-Scanfenster gegen WLAN-Abbrüche, `channel_colors` statt `rgb_order`.
+### Documentation
+- README: note that `VENT_MODE` has no values on a Combi D6 E.
 
-### Dokumentation
-- README: Voraussetzungen und OTA an die neuen Beispiele angepasst.
+## [1.0.32] — 2026-09-24 — Fan level
 
-## [1.0.30] — 2026-09-23 — Heizanforderung (experimentell)
+### Added
+- `truma_inetbox`: Sensor `VENT_MODE` shows the fan level (0 off, 1–10, 11 heater fan Eco, 13 heater
+  fan High). Display only, checked on a Combi 4 (issue #25).
 
-### Hinzugefügt
-- `truma_inetbox`: Binärsensor `HEATING_DEMAND` und Sensoren `PID22_BYTE0`/`PID22_BYTE1`,
-  experimentell und nur für die Combi 4 (Issue #25). `HEATING_DEMAND` zeigt, ob die Heizung Wärme
-  anfordert, nicht ob der Brenner läuft.
+### Documentation
+- README: `HEATING_DEMAND` stays off in water-heater-only mode.
+- README: `PID22_BYTE0` is the supply voltage, confirmed by a second measurement.
 
-## [1.0.29] — 2026-09-21 — Warnungen zu unbenutzten Funktionen
+## [1.0.31] — 2026-09-23 — Example configurations for ESPHome 2026.9.0
 
-### Behoben
-- `truma_inetbox`: Keine `-Wunused-function`-Warnungen mehr beim Build.
+### Changed
+- Example YAMLs: The API key comes from `!secret api_encryption_key`, ESPHome 2026.9.0 rejects the
+  empty key.
+- Example YAMLs: OTA uses the API encryption instead of a password. Switching over: see README,
+  section OTA.
+- Example YAMLs: Shorter BLE scan window against Wi-Fi drops, `channel_colors` instead of
+  `rgb_order`.
 
-## [1.0.28] — 2026-09-21 — Formatwarnungen in der UART-Komponente
+### Documentation
+- README: Prerequisites and OTA adapted to the new examples.
 
-### Behoben
-- `uart`: Keine `-Wformat`-Warnungen mehr beim Build für den ESP32-S3. Die geloggten Werte waren
-  auch vorher richtig.
+## [1.0.30] — 2026-09-23 — Heat demand (experimental)
 
-## [1.0.27] — 2026-09-19 — Actions in Triggern mit Argument
+### Added
+- `truma_inetbox`: Binary sensor `HEATING_DEMAND` and sensors `PID22_BYTE0`/`PID22_BYTE1`,
+  experimental and Combi 4 only (issue #25). `HEATING_DEMAND` shows whether the heater requests
+  heat, not whether the burner is running.
 
-### Behoben
-- `truma_inetbox`, `uart`: Die Actions lassen sich mit ESPHome 2026.9 auch in Triggern mit Argument
-  nutzen, etwa in `api:`-Actions oder `on_value`. Vorher brach der Build dort ab.
+## [1.0.29] — 2026-09-21 — Unused function warnings
 
-## [1.0.26] — 2026-09-15 — Log-PID behoben, `OPERATING_STATUS` richtiggestellt
+### Fixed
+- `truma_inetbox`: No more `-Wunused-function` warnings during the build.
 
-### Behoben
-- `truma_inetbox`: Im VERBOSE-Log passten PID und Daten der LIN-Frames nicht zusammen. Betraf nur
-  die Log-Ausgabe.
+## [1.0.28] — 2026-09-21 — Format warnings in the UART component
 
-### Dokumentation
-- README: `OPERATING_STATUS` ab 5 zeigt nicht den laufenden Brenner, die Werte hängen vom Modell ab
-  (Issue #25).
+### Fixed
+- `uart`: No more `-Wformat` warnings when building for the ESP32-S3. The logged values were correct
+  before as well.
 
-## [1.0.25] — 2026-09-07 — Beispiel-YAMLs: `id` für Operating Status
+## [1.0.27] — 2026-09-19 — Actions in triggers with arguments
 
-### Dokumentation
-- Heizungs-Beispiele: Der Sensor „Operating Status“ hat `id: operating_status` für Lambdas.
-- README: Werte von `OPERATING_STATUS` erklärt, in 1.0.26 korrigiert.
+### Fixed
+- `truma_inetbox`, `uart`: With ESPHome 2026.9 the actions also work in triggers with arguments,
+  e.g. in `api:` actions or `on_value`. Before, the build failed there.
 
-## [1.0.24] — 2026-07-17 — Korrekturen aus Code-Audit
+## [1.0.26] — 2026-09-15 — Log PID fixed, `OPERATING_STATUS` corrected
 
-### Behoben
-- `truma_inetbox`: „CP Plus verbunden“ meldete etwa alle 71 Minuten kurz fälschlich `false`.
+### Fixed
+- `truma_inetbox`: In the VERBOSE log, PID and data of the LIN frames did not match. Only the log
+  output was affected.
 
-## [1.0.23] — 2026-07-09 — UART-Startfehler behoben
+### Documentation
+- README: `OPERATING_STATUS` from 5 upwards does not show a running burner, the values depend on the
+  model (issue #25).
 
-### Behoben
-- `uart`: Die UART-Komponente konnte je nach Build beim Start auf `FAILED` gehen, dann lief kein
-  LIN-Verkehr („Cannot update Truma“). Die Ursache stand nur im seriellen Boot-Log (Issue #21).
-- `truma_inetbox`: Build-Fehler mit `logger: level: VERBOSE` behoben (Issue #22).
+## [1.0.25] — 2026-09-07 — Example YAMLs: `id` for Operating Status
 
-### Geändert
-- Die Log-Zeile `Component version:` zeigt wieder die richtige Version, sie stand seit 1.0.20 fest.
+### Documentation
+- Heater examples: The sensor "Operating Status" has `id: operating_status` for lambdas.
+- README: Values of `OPERATING_STATUS` explained, corrected in 1.0.26.
 
-## [1.0.22] — 2026-07-03 — Truma Cooler C69: Master-Power-Schalter + Kompressor bestätigt
+## [1.0.24] — 2026-07-17 — Fixes from code audit
 
-### Hinzugefügt
-- `truma_cooler` C69: Schalter `power` schaltet die ganze Box ein und aus (Issue #18).
+### Fixed
+- `truma_inetbox`: "CP Plus connected" briefly reported `false` by mistake about every 71 minutes.
 
-### Geändert
-- `truma_cooler` C69: Die Zonen-Climates kühlen nur noch und setzen die Solltemperatur, Ein/Aus
-  läuft über `power`. Bestehende C69-Konfigurationen brauchen den `power`-Schalter, siehe Beispiel.
-- `truma_cooler` C69: Kompressor-Status an echter Hardware bestätigt (Issue #18).
+## [1.0.23] — 2026-07-09 — UART startup failure fixed
 
-## [1.0.21] — 2026-07-03 — Truma Cooler: C69 (zwei Zonen) via `model:`-Selektor
+### Fixed
+- `uart`: Depending on the build, the UART component could end up `FAILED` at startup, then there
+  was no LIN traffic ("Cannot update Truma"). The cause only showed in the serial boot log (issue
+  #21).
+- `truma_inetbox`: Build error with `logger: level: VERBOSE` fixed (issue #22).
 
-### Hinzugefügt
-- `truma_cooler`: Auswahl `model:` (`c44` Standard, `c69`). C44-Konfigurationen ohne `model:` laufen
-  unverändert.
-- `truma_cooler` C69: Zwei Zonen mit eigener Soll- und Ist-Temperatur, Kompressor- und Gerätestatus.
-  Ein/Aus gilt für die ganze Box, Turbo ist nicht umgesetzt. Beispiel
+### Changed
+- The log line `Component version:` shows the correct version again, it was stuck at 1.0.20.
+
+## [1.0.22] — 2026-07-03 — Truma Cooler C69: master power switch + compressor confirmed
+
+### Added
+- `truma_cooler` C69: Switch `power` turns the whole box on and off (issue #18).
+
+### Changed
+- `truma_cooler` C69: The zone climates only cool and set the target temperature, on/off goes
+  through `power`. Existing C69 configurations need the `power` switch, see the example.
+- `truma_cooler` C69: Compressor status confirmed on real hardware (issue #18).
+
+## [1.0.21] — 2026-07-03 — Truma Cooler: C69 (dual zone) via `model:` selector
+
+### Added
+- `truma_cooler`: Selector `model:` (`c44` default, `c69`). C44 configurations without `model:` keep
+  working unchanged.
+- `truma_cooler` C69: Two zones with their own target and actual temperature, compressor and device
+  status. On/off applies to the whole box, turbo is not implemented. Example
   `ESP32_truma_cooler_C69_example.yaml`.
 
-## [1.0.20] — 2026-05-12 — Truma Cooler: Absicherung und Zustand nach Neustart
+## [1.0.20] — 2026-05-12 — Truma Cooler: hardening and state after restart
 
-### Hinzugefügt
-- `truma_cooler`: Modus und Solltemperatur bleiben über einen Neustart erhalten, Turbo und
-  Gerätestatus starten mit „aus“ statt „unbekannt“.
+### Added
+- `truma_cooler`: Mode and target temperature survive a restart, turbo and device status start as
+  "off" instead of "unknown".
 
-### Geändert
-- `truma_cooler`: BLE-Ereignisse ändern Entitäten nur noch aus der Hauptschleife.
+### Changed
+- `truma_cooler`: BLE events only change entities from the main loop.
 
-### Behoben
-- `truma_cooler`: Schnelles Ein- und Ausschalten schickt keinen überflüssigen Turbo-Aus-Befehl mehr.
+### Fixed
+- `truma_cooler`: Quickly switching on and off no longer sends a needless turbo-off command.
 
-## [1.0.19] — 2026-05-12 — RP2040-Support entfernt
+## [1.0.19] — 2026-05-12 — RP2040 support removed
 
-### Entfernt
-- Unterstützung für den Raspberry Pi Pico (RP2040), das Repo ist nur noch für ESP-IDF.
+### Removed
+- Support for the Raspberry Pi Pico (RP2040), the repo is ESP-IDF only.
 
-## [1.0.18] — 2026-04-29 — Thread-Sicherheit Heizung/Klima/Uhr
+## [1.0.18] — 2026-04-29 — Thread safety in heater/aircon/clock
 
-### Geändert
-- `truma_inetbox`: Statusflags zwischen LIN-Task und Hauptschleife sind gegen gleichzeitigen Zugriff
-  abgesichert.
+### Changed
+- `truma_inetbox`: Status flags between LIN task and main loop are protected against concurrent
+  access.
 
-## [1.0.17] — 2026-04-29 — Truma Cooler: Robustheitsfixes
+## [1.0.17] — 2026-04-29 — Truma Cooler: robustness fixes
 
-### Geändert
-- `truma_cooler`: Code aufgeräumt, Zugriffe zwischen BLE- und App-Task abgesichert.
+### Changed
+- `truma_cooler`: Code cleanup, access between BLE and app task protected.
 
-### Behoben
-- `truma_cooler`: Turbo-Befehle bei ausgeschalteter Box werden ignoriert.
-- `truma_cooler`: Nach dem Verbinden zeigt das Climate „aus“ statt „unbekannt“.
-- `truma_cooler`: Ein Verbindungsabbruch lässt keinen offenen Turbo-Reset mehr zurück.
+### Fixed
+- `truma_cooler`: Turbo commands are ignored while the box is off.
+- `truma_cooler`: After connecting, the climate shows "off" instead of "unknown".
+- `truma_cooler`: A disconnect no longer leaves a pending turbo reset behind.
 
-## [1.0.16] — 2026-04-26 — Versionsanzeige im Webinterface
+## [1.0.16] — 2026-04-26 — Version display in web interface
 
-### Hinzugefügt
-- Text-Sensor zeigt die Komponentenversion in Home Assistant und im Webinterface, alle
-  Heizungs-Beispiele enthalten ihn. Die Version steht auch im Start-Log.
+### Added
+- Text sensor shows the component version in Home Assistant and the web interface, all heater
+  examples include it. The version is also logged at startup.
 
-## [1.0.15] — 2026-04-23 — Sicherheits- und Robustheitsfixes
+## [1.0.15] — 2026-04-23 — Safety and robustness fixes
 
-### Behoben
-- `truma_inetbox`: Unvollständige LIN-Frames werden verworfen, volle Warteschlangen im Log gemeldet.
-- `truma_inetbox`: Der Betriebsstatus „ON 255“ wurde als „ON 25“ angezeigt.
-- `truma_inetbox`: Ohne Zeitserver blieb die Uhr dauerhaft im Update-Zustand.
-- `truma_cooler`: Die Solltemperatur wird auch übernommen, wenn gleichzeitig der Modus wechselt.
-- `truma_inetbox`, `truma_cooler`: Zugriffe zwischen Tasks abgesichert.
+### Fixed
+- `truma_inetbox`: Incomplete LIN frames are dropped, full queues are reported in the log.
+- `truma_inetbox`: The operating status "ON 255" was shown as "ON 25".
+- `truma_inetbox`: Without a time server, the clock stayed in update state forever.
+- `truma_cooler`: The target temperature is applied also when the mode changes at the same time.
+- `truma_inetbox`, `truma_cooler`: Access between tasks protected.
 
-## [1.0.14] — 2026-04-21 — Truma Cooler C(XX) Integration
+## [1.0.14] — 2026-04-21 — Truma Cooler C(XX) integration
 
-### Hinzugefügt
-- Neue Komponente `truma_cooler` für die Truma Cooler C(XX) über BLE: Climate (−22 bis +10 °C),
-  Innen- und Außentemperatur, Kompressor, Turbo, Geräte- und Verbindungsstatus.
-- Beispiel `ESP32_truma_cooler_example.yaml` (M5Stack Atom Lite), parallel als Bluetooth Proxy
-  nutzbar.
+### Added
+- New component `truma_cooler` for the Truma Cooler C(XX) via BLE: climate (−22 to +10 °C), inside
+  and outside temperature, compressor, turbo, device and connection status.
+- Example `ESP32_truma_cooler_example.yaml` (M5Stack Atom Lite), can be used as Bluetooth proxy at
+  the same time.
 
-## [1.0.13] — 2026-04-20 — Truma Aventa Gen 2 Klimaanlage
+## [1.0.13] — 2026-04-20 — Truma Aventa Gen 2 air conditioning
 
-### Hinzugefügt
-- Truma Aventa Gen 2 über denselben LIN-Bus wie die Heizung: Climate `AIRCON`, Selects `AIRCON_MODE`
-  und `AIRCON_VENT_MODE`, Number `AIRCON_MANUAL_TEMPERATURE`. Beispiel
+### Added
+- Truma Aventa Gen 2 over the same LIN bus as the heater: climate `AIRCON`, selects `AIRCON_MODE`
+  and `AIRCON_VENT_MODE`, number `AIRCON_MANUAL_TEMPERATURE`. Example
   `ESP32-S3_truma_Aventa_example.yaml`.
 
-## [1.0.12] — 2026-04-19 — LIN-Korrekturen
+## [1.0.12] — 2026-04-19 — LIN fixes
 
-### Behoben
-- `truma_inetbox`: LIN-Nachrichten über 255 Byte wurden verworfen.
-- `truma_inetbox`: Eingehende Frames werden vor der Auswertung auf ihre Länge geprüft.
-- `truma_inetbox`: Zeitvergleiche stimmen auch nach dem Zählerüberlauf (etwa alle 71 Minuten),
-  Zugriffe zwischen Tasks abgesichert.
-- `truma_inetbox`: Im Log fehlte das CRC-Byte.
+### Fixed
+- `truma_inetbox`: LIN messages over 255 bytes were dropped.
+- `truma_inetbox`: Incoming frames are checked for their length before evaluation.
+- `truma_inetbox`: Time comparisons are correct also after the counter rolls over (about every 71
+  minutes), access between tasks protected.
+- `truma_inetbox`: The CRC byte was missing in the log.
 
-## [1.0.11] — 2026-04-17 — ESPHome 2026.4.0 Kompatibilität
+## [1.0.11] — 2026-04-17 — ESPHome 2026.4.0 compatibility
 
-### Behoben
-- `truma_inetbox`: Build-Fehler mit ESPHome 2026.4 behoben.
-- Beispiel-YAMLs: Sensoren mit demselben Namen wie eine Number oder ein Select brachten mit ESPHome
-  2026.4.0 die HA-Integration zum Absturz. `Target Room Temperature`, `Target Water Temperature`,
-  `Electric Power Level` und `Energy Mix` heißen als Sensor jetzt mit Suffix „Status“. Nach dem
-  Flashen die alten Sensoren in HA löschen und Dashboards und Automationen auf die neuen umstellen.
+### Fixed
+- `truma_inetbox`: Build error with ESPHome 2026.4 fixed.
+- Example YAMLs: Sensors with the same name as a number or select crashed the HA integration with
+  ESPHome 2026.4.0. `Target Room Temperature`, `Target Water Temperature`, `Electric Power Level`
+  and `Energy Mix` now carry the suffix "Status" as sensors. After flashing, delete the old sensors
+  in HA and switch dashboards and automations to the new ones.
 
-### Dokumentation
-- Hardware-Dokumentation für den Nachbau erweitert.
+### Documentation
+- Hardware documentation extended to make rebuilding easier.
 
-## [1.0.10] — 2026-04-11 — Weitere Aufräumarbeiten
+## [1.0.10] — 2026-04-11 — Further cleanup
 
-### Geändert
-- `truma_inetbox`: Code aufgeräumt. Das Heizungsmodul loggt seinen Zustand auf DEBUG, Fehlercodes
-  auf WARN.
+### Changed
+- `truma_inetbox`: Code cleanup. The heater module logs its state at DEBUG, error codes at WARN.
 
-## [1.0.9] — 2026-04-02 — Aufräumen
+## [1.0.9] — 2026-04-02 — Cleanup
 
-### Geändert
-- Code aufgeräumt, keine Verhaltensänderung.
+### Changed
+- Code cleanup, no change in behavior.
 
-## [1.0.8] — 2026-03-30 — Codequalität
+## [1.0.8] — 2026-03-30 — Code quality
 
-### Behoben
-- `truma_inetbox`: Energiemix und elektrische Leistungsstufe wurden in der Antwort an den CP Plus
-  falsch gesetzt.
+### Fixed
+- `truma_inetbox`: Energy mix and electric power level were set wrongly in the answer to the CP
+  Plus.
 
-### Geändert
-- Tippfehler und Kommentare bereinigt.
+### Changed
+- Typos and comments cleaned up.
 
-### Dokumentation
-- README nennt den Fork von @kamahat.
+### Documentation
+- README mentions the fork of @kamahat.
 
-## [1.0.7] — 2026-03-28 — Kleinere Verbesserungen
+## [1.0.7] — 2026-03-28 — Minor improvements
 
-### Behoben
-- „LIN CRC error on SID“ erscheint nur noch im VERBOSE-Log, es ist kein echter Fehler (Vorschlag von
+### Fixed
+- "LIN CRC error on SID" only appears in the VERBOSE log, it is not a real error (suggested by
   @kamahat).
 
-### Dokumentation
-- `min_version: 2026.3.1` in allen Beispielen, CONTRIBUTING-Dateien ergänzt.
+### Documentation
+- `min_version: 2026.3.1` in all examples, CONTRIBUTING files added.
 
-## [1.0.6] — 2026-03-27 — Robustheit
+## [1.0.6] — 2026-03-27 — Robustness
 
-### Behoben
-- `truma_inetbox`: Absturz beim Start auf Dual-Core-ESP32 behoben. Kommt der UART-Treiber nicht
-  hoch, steht nach 5 s eine klare Meldung im Log.
+### Fixed
+- `truma_inetbox`: Crash at startup on dual-core ESP32 fixed. If the UART driver does not come up, a
+  clear message is logged after 5 s.
 
-## [1.0.5] — 2026-03-27 — Verbesserungen
+## [1.0.5] — 2026-03-27 — Improvements
 
-### Geändert
-- Beispiel-YAMLs: `refresh: 24h` statt `0s`, Alternativen als Kommentar.
+### Changed
+- Example YAMLs: `refresh: 24h` instead of `0s`, alternatives as comments.
 
-## [1.0.4] — 2026-03-23 — Fehlerbehebungen
+## [1.0.4] — 2026-03-23 — Bugfixes
 
-### Behoben
-- `uart`: Prüfung der Rohdaten für `uart.write` korrigiert.
-- README: Veralteter Name der Diesel-Beispieldatei korrigiert.
+### Fixed
+- `uart`: Raw data check for `uart.write` corrected.
+- README: Outdated name of the diesel example file corrected.
 
-## [1.0.3] — 2026-03-22 — OTA, Aufräumen
+## [1.0.3] — 2026-03-22 — OTA, cleanup
 
-### Hinzugefügt
-- OTA in allen WLAN-Beispielen, dazu ein Abschnitt im README.
+### Added
+- OTA in all Wi-Fi examples, plus a section in the README.
 
-### Entfernt
-- Ethernet-Beispiele von WomoLin und das Verzeichnis `examples/`.
+### Removed
+- WomoLin Ethernet examples and the `examples/` directory.
 
-## [1.0.2] — 2026-03-19 — Beispielkonfigurationen und Dokumentation
+## [1.0.2] — 2026-03-19 — Example configurations and documentation
 
-### Hinzugefügt
-- Gas-Beispiele für ESP32 und ESP32-S3.
+### Added
+- Gas examples for ESP32 and ESP32-S3.
 
-### Geändert
-- Die Diesel-Beispiele heißen jetzt `*_6DE_Diesel_example.yaml`.
-- Actions an ESPHome 2026.3.0 angepasst.
+### Changed
+- The diesel examples are now named `*_6DE_Diesel_example.yaml`.
+- Actions adapted to ESPHome 2026.3.0.
 
-### Dokumentation
-- README: Auswahl der Beispiele nach Energiequelle und Hardware, Hinweise zur Combi 4 und zu
-  Diesel-Modellen ohne Eberspächer-Brenner.
+### Documentation
+- README: Choosing the example by energy source and hardware, notes on the Combi 4 and on diesel
+  models without Eberspächer burner.
 
-## [1.0.1] — 2026-03-14 — ESPHome 2026.6 Kompatibilität
+## [1.0.1] — 2026-03-14 — ESPHome 2026.6 compatibility
 
-### Geändert
-- Veraltete ESPHome-APIs ersetzt, damit die Komponenten auch mit ESPHome 2026.6 bauen.
+### Changed
+- Deprecated ESPHome APIs replaced so the components also build with ESPHome 2026.6.
 
-## [1.0.0] — 2026-03-02 — ESPHome 2025.8+ / 2026.3.x Kompatibilität
+## [1.0.0] — 2026-03-02 — ESPHome 2025.8+ / 2026.3.x compatibility
 
-### Hinzugefügt
-- Test-Konfigurationen `test_compile.yaml` und `test_compile_idf.yaml`.
+### Added
+- Test configurations `test_compile.yaml` and `test_compile_idf.yaml`.
 
-### Geändert
-- `uart`: An ESPHome 2025.8+ und ESP-IDF 5.x angepasst. Die eigene UART-Komponente bleibt nötig,
-  weil die LIN-Erkennung die Event-Queue braucht.
-- `truma_inetbox`: Baut mit ESP-IDF 5.x.
+### Changed
+- `uart`: Adapted to ESPHome 2025.8+ and ESP-IDF 5.x. The own UART component is still needed because
+  LIN detection requires the event queue.
+- `truma_inetbox`: Builds with ESP-IDF 5.x.

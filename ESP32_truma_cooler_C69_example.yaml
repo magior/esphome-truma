@@ -45,7 +45,7 @@ wifi:
 external_components:
   - source:
       type: git
-      url: https://github.com/havanti/esphome-truma
+      url: https://github.com/magior/esphome-truma
     components: [truma_cooler]
     refresh: always
 
