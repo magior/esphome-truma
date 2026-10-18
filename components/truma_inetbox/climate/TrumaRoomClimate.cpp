@@ -11,6 +11,7 @@ static constexpr float ROOM_TEMPERATURE_MAX = 30;
 static constexpr float ROOM_TEMPERATURE_STEP = 1;
 
 void TrumaRoomClimate::setup() {
+  // Before any target since boot: the switch-on value, the lowest.
   this->last_target_temperature_ = ROOM_SWITCH_ON_TEMPERATURE;
   this->target_temperature = this->last_target_temperature_;
   this->parent_->get_heater()->add_on_message_callback([this](const StatusFrameHeater *status_heater) {
@@ -57,10 +58,10 @@ void TrumaRoomClimate::control(const climate::ClimateCall &call) {
     climate::ClimateMode mode = *call.get_mode();
     switch (mode) {
       case climate::CLIMATE_MODE_HEAT:
-        // A target in the same call or a pending one from a previous call wins over the switch-on default.
+        // Switch on to the last target shown; a target in this call or a pending one wins.
         if (heater->pending_target_temp_room() == TargetTemp::TARGET_TEMP_OFF &&
             !call.get_target_temperature().has_value()) {
-          heater->action_heater_room(ROOM_SWITCH_ON_TEMPERATURE);
+          heater->action_heater_room(static_cast<uint8_t>(this->last_target_temperature_));
         }
         break;
       default:
@@ -71,7 +72,8 @@ void TrumaRoomClimate::control(const climate::ClimateCall &call) {
 
   if (call.get_fan_mode().has_value()) {
     auto fan_mode = *call.get_fan_mode();
-    float temp = temp_code_to_decimal(heater->pending_target_temp_room(), 0);
+    // While off, switch on to the last target shown.
+    float temp = temp_code_to_decimal(heater->pending_target_temp_room(), this->last_target_temperature_);
     if (call.get_target_temperature().has_value()) {
       temp = *call.get_target_temperature();
     }
