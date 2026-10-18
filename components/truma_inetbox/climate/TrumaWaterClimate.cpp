@@ -11,9 +11,15 @@ static constexpr float WATER_TEMPERATURE_MAX = 80;
 static constexpr float WATER_TEMPERATURE_STEP = 20;
 
 void TrumaWaterClimate::setup() {
+  this->last_target_temperature_ = WATER_SWITCH_ON_TEMPERATURE;
+  this->target_temperature = this->last_target_temperature_;
   this->parent_->get_heater()->add_on_message_callback([this](const StatusFrameHeater *status_heater) {
     // Publish updated state
-    this->target_temperature = water_temp_200_fix(temp_code_to_decimal(status_heater->target_temp_water));
+    float target = water_temp_200_fix(temp_code_to_decimal(status_heater->target_temp_water));
+    if (!std::isnan(target)) {
+      this->last_target_temperature_ = target;
+    }
+    this->target_temperature = this->last_target_temperature_;
     this->current_temperature = temp_code_to_decimal(status_heater->current_temp_water);
     this->mode = (status_heater->target_temp_water == TargetTemp::TARGET_TEMP_OFF) ? climate::CLIMATE_MODE_OFF
                                                                                    : climate::CLIMATE_MODE_HEAT;
@@ -53,7 +59,9 @@ climate::ClimateTraits TrumaWaterClimate::traits() {
   traits.set_supported_modes({climate::CLIMATE_MODE_OFF, climate::CLIMATE_MODE_HEAT});
   traits.set_visual_min_temperature(WATER_TEMPERATURE_MIN);
   traits.set_visual_max_temperature(WATER_TEMPERATURE_MAX);
-  traits.set_visual_temperature_step(WATER_TEMPERATURE_STEP);
+  // Home Assistant takes the current step as precision and only accepts 0.1, 0.5 or 1.
+  traits.set_visual_target_temperature_step(WATER_TEMPERATURE_STEP);
+  traits.set_visual_current_temperature_step(1);
   return traits;
 }
 }  // namespace truma_inetbox
