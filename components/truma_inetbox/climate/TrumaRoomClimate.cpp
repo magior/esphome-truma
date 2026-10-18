@@ -11,8 +11,14 @@ static constexpr float ROOM_TEMPERATURE_MAX = 30;
 static constexpr float ROOM_TEMPERATURE_STEP = 1;
 // Home Assistant takes the current step as precision: the room temperature comes in tenths.
 static constexpr float ROOM_CURRENT_TEMPERATURE_STEP = 0.1;
+// Fan levels named as on the CP Plus. ClimateCall::set_fan_mode() matches the standard fan modes first and
+// ignores case, so a custom "high" (or "High") would always resolve to CLIMATE_FAN_HIGH: the High level is
+// that standard mode, and only Eco and Boost are custom.
+static const char *const FAN_MODE_ECO = "eco";
+static const char *const FAN_MODE_BOOST = "boost";
 
 void TrumaRoomClimate::setup() {
+  this->set_supported_custom_fan_modes({FAN_MODE_ECO, FAN_MODE_BOOST});
   // Before any target since boot: the switch-on value, the lowest.
   this->last_target_temperature_ = ROOM_SWITCH_ON_TEMPERATURE;
   this->target_temperature = this->last_target_temperature_;
@@ -29,17 +35,17 @@ void TrumaRoomClimate::setup() {
     switch (status_heater->heating_mode) {
       case HeatingMode::HEATING_MODE_ECO:
       case HeatingMode::HEATING_MODE_VARIO_HEAT_NIGHT:
-        this->fan_mode = climate::CLIMATE_FAN_LOW;
+        this->set_custom_fan_mode_(FAN_MODE_ECO);
         break;
       case HeatingMode::HEATING_MODE_HIGH:
       case HeatingMode::HEATING_MODE_VARIO_HEAT_AUTO:
-        this->fan_mode = climate::CLIMATE_FAN_MEDIUM;
+        this->set_fan_mode_(climate::CLIMATE_FAN_HIGH);
         break;
       case HeatingMode::HEATING_MODE_BOOST:
-        this->fan_mode = climate::CLIMATE_FAN_HIGH;
+        this->set_custom_fan_mode_(FAN_MODE_BOOST);
         break;
       default:
-        this->fan_mode = climate::CLIMATE_FAN_OFF;
+        this->set_fan_mode_(climate::CLIMATE_FAN_OFF);
         break;
     }
     this->publish_state();
@@ -50,7 +56,8 @@ void TrumaRoomClimate::dump_config() { LOG_CLIMATE(TAG, "Truma Room Climate", th
 
 void TrumaRoomClimate::control(const climate::ClimateCall &call) {
   auto heater = this->parent_->get_heater();
-  if (call.get_target_temperature().has_value() && !call.get_fan_mode().has_value()) {
+  if (call.get_target_temperature().has_value() && !call.get_fan_mode().has_value() &&
+      !call.has_custom_fan_mode()) {
     float temp = *call.get_target_temperature();
     heater->action_heater_room(static_cast<uint8_t>(temp));
   }
@@ -72,41 +79,36 @@ void TrumaRoomClimate::control(const climate::ClimateCall &call) {
     }
   }
 
-  if (call.get_fan_mode().has_value()) {
-    auto fan_mode = *call.get_fan_mode();
+  // The fan level to set, or HEATING_MODE_OFF to switch off.
+  // Eco/High are Night/Auto on a Vario Heat, like the fan mode select.
+  optional<HeatingMode> heating_mode;
+  if (call.has_custom_fan_mode()) {
+    auto fan_mode = call.get_custom_fan_mode();
+    if (fan_mode == FAN_MODE_ECO) {
+      heating_mode = heater->fan_mode_heating_mode(false);
+    } else if (fan_mode == FAN_MODE_BOOST) {
+      heating_mode = HeatingMode::HEATING_MODE_BOOST;
+    }
+  } else if (call.get_fan_mode().has_value()) {
+    heating_mode = *call.get_fan_mode() == climate::CLIMATE_FAN_HIGH ? heater->fan_mode_heating_mode(true)
+                                                                     : HeatingMode::HEATING_MODE_OFF;
+  }
+
+  if (heating_mode.has_value()) {
+    if (*heating_mode == HeatingMode::HEATING_MODE_OFF) {
+      heater->action_heater_room(0);
+      return;
+    }
     // While off, switch on to the last target shown.
     float temp = temp_code_to_decimal(heater->pending_target_temp_room(), this->last_target_temperature_);
     if (call.get_target_temperature().has_value()) {
       temp = *call.get_target_temperature();
     }
-    switch (fan_mode) {
-      case climate::CLIMATE_FAN_LOW:
-      case climate::CLIMATE_FAN_MEDIUM:
-      case climate::CLIMATE_FAN_HIGH:
-        if (temp < ROOM_SWITCH_ON_TEMPERATURE) {
-          temp = ROOM_SWITCH_ON_TEMPERATURE;
-        }
-        break;
-      default:
-        break;
+    if (temp < ROOM_SWITCH_ON_TEMPERATURE) {
+      temp = ROOM_SWITCH_ON_TEMPERATURE;
     }
-    // LOW/MEDIUM are Eco/High on a Combi and Night/Auto on a Vario Heat, like the fan mode select.
-    switch (fan_mode) {
-      case climate::CLIMATE_FAN_LOW:
-        heater->action_heater_room(static_cast<uint8_t>(temp), heater->fan_mode_heating_mode(false));
-        break;
-      case climate::CLIMATE_FAN_MEDIUM:
-        heater->action_heater_room(static_cast<uint8_t>(temp), heater->fan_mode_heating_mode(true));
-        break;
-      case climate::CLIMATE_FAN_HIGH:
-        heater->action_heater_room(static_cast<uint8_t>(temp), HeatingMode::HEATING_MODE_BOOST);
-        break;
-      default:
-        heater->action_heater_room(0);
-        break;
-    }
+    heater->action_heater_room(static_cast<uint8_t>(temp), *heating_mode);
   }
-
 }
 
 climate::ClimateTraits TrumaRoomClimate::traits() {
@@ -114,12 +116,8 @@ climate::ClimateTraits TrumaRoomClimate::traits() {
   auto traits = climate::ClimateTraits();
   traits.add_feature_flags(climate::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE);
   traits.set_supported_modes({climate::CLIMATE_MODE_OFF, climate::CLIMATE_MODE_HEAT});
-  traits.set_supported_fan_modes({{
-      climate::CLIMATE_FAN_OFF,
-      climate::CLIMATE_FAN_LOW,
-      climate::CLIMATE_FAN_MEDIUM,
-      climate::CLIMATE_FAN_HIGH,
-  }});
+  // Custom fan modes (eco, boost) are set in setup().
+  traits.set_supported_fan_modes({climate::CLIMATE_FAN_OFF, climate::CLIMATE_FAN_HIGH});
   traits.set_visual_min_temperature(ROOM_TEMPERATURE_MIN);
   traits.set_visual_max_temperature(ROOM_TEMPERATURE_MAX);
   traits.set_visual_target_temperature_step(ROOM_TEMPERATURE_STEP);
