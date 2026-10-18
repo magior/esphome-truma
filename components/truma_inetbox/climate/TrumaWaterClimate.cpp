@@ -11,6 +11,7 @@ static constexpr float WATER_TEMPERATURE_MAX = 80;
 static constexpr float WATER_TEMPERATURE_STEP = 20;
 
 void TrumaWaterClimate::setup() {
+  // Before any target since boot: the switch-on value, the lowest.
   this->last_target_temperature_ = WATER_SWITCH_ON_TEMPERATURE;
   this->target_temperature = this->last_target_temperature_;
   this->parent_->get_heater()->add_on_message_callback([this](const StatusFrameHeater *status_heater) {
@@ -39,10 +40,10 @@ void TrumaWaterClimate::control(const climate::ClimateCall &call) {
     climate::ClimateMode mode = *call.get_mode();
     switch (mode) {
       case climate::CLIMATE_MODE_HEAT:
-        // A target in the same call or a pending one from a previous call wins over the switch-on default.
+        // Switch on to the last target shown; a target in this call or a pending one wins.
         if (this->parent_->get_heater()->pending_target_temp_water() == TargetTemp::TARGET_TEMP_OFF &&
             !call.get_target_temperature().has_value()) {
-          this->parent_->get_heater()->action_heater_water(WATER_SWITCH_ON_TEMPERATURE);
+          this->parent_->get_heater()->action_heater_water(static_cast<uint8_t>(this->last_target_temperature_));
         }
         break;
       default:
