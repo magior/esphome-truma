@@ -12,8 +12,13 @@ static constexpr float WATER_TEMPERATURE_STEP = 20;
 // The CP Plus reports the water temperature in whole degrees; Home Assistant MQTT discovery accepts precision values
 // of 0.1, 0.5 or 1.
 static constexpr float WATER_CURRENT_TEMPERATURE_STEP = 1;
+// Water levels named as on the CP Plus: eco and boost are the standard presets, hot is custom.
+// ClimateCall::set_preset() matches the standard presets first and ignores case, so a custom preset
+// cannot be called "eco" or "boost".
+static const char *const PRESET_HOT = "hot";
 
 void TrumaWaterClimate::setup() {
+  this->set_supported_custom_presets({PRESET_HOT});
   // Before any target since boot: the switch-on value, the lowest.
   this->last_target_temperature_ = WATER_SWITCH_ON_TEMPERATURE;
   this->target_temperature = this->last_target_temperature_;
@@ -27,6 +32,15 @@ void TrumaWaterClimate::setup() {
     this->current_temperature = temp_code_to_decimal(status_heater->current_temp_water);
     this->mode = (status_heater->target_temp_water == TargetTemp::TARGET_TEMP_OFF) ? climate::CLIMATE_MODE_OFF
                                                                                    : climate::CLIMATE_MODE_HEAT;
+    if (target == 40) {
+      this->set_preset_(climate::CLIMATE_PRESET_ECO);
+    } else if (target == 60) {
+      this->set_custom_preset_(PRESET_HOT);
+    } else if (target == 80) {
+      this->set_preset_(climate::CLIMATE_PRESET_BOOST);
+    } else {
+      this->set_preset_(climate::CLIMATE_PRESET_NONE);
+    }
     this->publish_state();
   });
 }
@@ -34,7 +48,7 @@ void TrumaWaterClimate::setup() {
 void TrumaWaterClimate::dump_config() { LOG_CLIMATE(TAG, "Truma Water Climate", this); }
 
 void TrumaWaterClimate::control(const climate::ClimateCall &call) {
-  if (call.get_target_temperature().has_value()) {
+  if (call.get_target_temperature().has_value() && !call.get_preset().has_value() && !call.has_custom_preset()) {
     float temp = *call.get_target_temperature();
     this->parent_->get_heater()->action_heater_water(static_cast<uint8_t>(temp));
   }
@@ -54,6 +68,23 @@ void TrumaWaterClimate::control(const climate::ClimateCall &call) {
         break;
     }
   }
+
+  if (call.has_custom_preset()) {
+    if (call.get_custom_preset() == PRESET_HOT) {
+      this->parent_->get_heater()->action_heater_water(TargetTemp::TARGET_TEMP_WATER_HIGH);
+    }
+  } else if (call.get_preset().has_value()) {
+    switch (*call.get_preset()) {
+      case climate::CLIMATE_PRESET_ECO:
+        this->parent_->get_heater()->action_heater_water(TargetTemp::TARGET_TEMP_WATER_ECO);
+        break;
+      case climate::CLIMATE_PRESET_BOOST:
+        this->parent_->get_heater()->action_heater_water(TargetTemp::TARGET_TEMP_WATER_BOOST);
+        break;
+      default:
+        break;
+    }
+  }
 }
 
 climate::ClimateTraits TrumaWaterClimate::traits() {
@@ -61,6 +92,8 @@ climate::ClimateTraits TrumaWaterClimate::traits() {
   auto traits = climate::ClimateTraits();
   traits.add_feature_flags(climate::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE);
   traits.set_supported_modes({climate::CLIMATE_MODE_OFF, climate::CLIMATE_MODE_HEAT});
+  // Custom preset (hot) is set in setup().
+  traits.set_supported_presets({climate::CLIMATE_PRESET_ECO, climate::CLIMATE_PRESET_BOOST});
   traits.set_visual_min_temperature(WATER_TEMPERATURE_MIN);
   traits.set_visual_max_temperature(WATER_TEMPERATURE_MAX);
   traits.set_visual_target_temperature_step(WATER_TEMPERATURE_STEP);
