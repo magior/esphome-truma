@@ -16,7 +16,8 @@ class TrumaRoomClimate : public Component, public climate::Climate, public Paren
   climate::ClimateTraits traits() override;
 
  protected:
-  // Target shown while off: MQTT would publish "nan", which Home Assistant cannot convert.
+  // Last target: shown while off (MQTT would publish "nan", which Home Assistant cannot convert)
+  // and used to switch back on.
   float last_target_temperature_{NAN};
 };
 }  // namespace truma_inetbox
