@@ -66,6 +66,8 @@ void TrumaiNetBoxAppHeater::set_status(StatusFrameHeater val) {
 void TrumaiNetBoxAppHeater::reset() {
   TrumaStausFrameResponseStorage<StatusFrameHeater, StatusFrameHeaterResponse>::reset();
   this->wake_up_values_skipped_ = false;
+  std::lock_guard<std::mutex> guard(this->lock_);
+  this->uploaded_valid_ = false;
 }
 
 void TrumaiNetBoxAppHeater::create_update_data(StatusFrame *response, uint8_t *response_len,
@@ -84,7 +86,28 @@ void TrumaiNetBoxAppHeater::create_update_data(StatusFrame *response, uint8_t *r
   status_frame_calculate_checksum(response);
   (*response_len) = sizeof(StatusFrameHeader) + sizeof(StatusFrameHeaterResponse);
 
+  this->uploaded_ = this->submitted_;
+  this->uploaded_counter_ = command_counter;
+  this->uploaded_valid_ = true;
   TrumaStausFrameResponseStorage<StatusFrameHeater, StatusFrameHeaterResponse>::update_submitted();
+}
+
+void TrumaiNetBoxAppHeater::on_upload_accepted(uint8_t command_counter) {
+  std::lock_guard<std::mutex> guard(this->lock_);
+  if (!this->uploaded_valid_ || command_counter != this->uploaded_counter_) {
+    return;
+  }
+  this->uploaded_valid_ = false;
+  ESP_LOGD(TAG, "Heater upload %02X accepted", command_counter);
+  // The last status with the accepted values, handed over like a downloaded status.
+  this->incoming_.target_temp_room = this->uploaded_.target_temp_room;
+  this->incoming_.heating_mode = this->uploaded_.heating_mode;
+  this->incoming_.target_temp_water = this->uploaded_.target_temp_water;
+  this->incoming_.energy_mix_a = this->uploaded_.energy_mix_a;
+  this->incoming_.el_power_level_a = this->uploaded_.el_power_level_a;
+  this->incoming_.el_power_level_b = this->uploaded_.el_power_level_b;
+  this->data_updated_.store(true);
+  this->on_status_received_();
 }
 
 void TrumaiNetBoxAppHeater::dump_data() const {
