@@ -32,6 +32,9 @@ class TrumaiNetBoxAppHeater : public TrumaStausFrameResponseStorage<StatusFrameH
   TargetTemp pending_target_temp_room() const;
   TargetTemp pending_target_temp_water() const;
 
+  // On a Combi, Boost is entered only with a target more than 10 °C above the room, the condition under which the
+  // CP Plus panel offers it: below that the C3 rejects 0x0B (ack 02). Such a request is dropped and the last
+  // status published again, so the climate and select show the real mode. An active Boost is kept.
   bool action_heater_room(uint8_t temperature, HeatingMode mode = HeatingMode::HEATING_MODE_OFF);
   bool action_heater_water(uint8_t temperature);
   bool action_heater_water(TargetTemp temperature);
