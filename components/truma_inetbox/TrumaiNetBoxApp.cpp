@@ -419,6 +419,8 @@ const uint8_t *TrumaiNetBoxApp::lin_multiframe_received(const uint8_t *message, 
     if (data.error_code != ResponseAckResult::RESPONSE_ACK_RESULT_OKAY) {
       // I tried to update something and it failed. Read current state again to validate and hold any updates for now.
       this->lin_reset_device();
+    } else {
+      this->heater_.on_upload_accepted(statusFrame->genericHeader.command_counter);
     }
 
     return response;
