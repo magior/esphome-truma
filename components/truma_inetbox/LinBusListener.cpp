@@ -196,6 +196,7 @@ void LinBusListener::read_lin_frame_() {
               }
             }
             if (crc_valid) {
+              this->last_valid_frame_.store(micros(), std::memory_order_relaxed);
               // Valid complete frame with a shorter-than-8-byte payload - log at verbose only.
 #ifdef ESPHOME_LOG_HAS_VERBOSE
               log_msg.type = QUEUE_LOG_MSG_TYPE::VERBOSE_READ_LIN_FRAME_MSG;
@@ -345,6 +346,9 @@ void LinBusListener::read_lin_frame_() {
     TRUMA_LOGV_ISR(log_msg);
 #endif  // ESPHOME_LOG_HAS_VERBOSE
 
+    if (this->current_data_valid) {
+      this->last_valid_frame_.store(micros(), std::memory_order_relaxed);
+    }
     if (this->current_data_valid && (message_from_master || this->current_PID_ == LIN_PID_STATUS_2 ||
                                      this->current_PID_ == LIN_PID_COMMAND_STATUS ||
                                      this->current_PID_ == LIN_PID_HEATER_STATUS_LEGACY)) {

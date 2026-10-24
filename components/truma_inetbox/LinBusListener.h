@@ -54,6 +54,9 @@ class LinBusListener : public PollingComponent, public uart::UARTDevice {
   void set_observer_mode(bool val) { this->observer_mode_.store(val, std::memory_order_relaxed); }
   bool get_observer_mode() const { return this->observer_mode_.load(std::memory_order_relaxed); }
   bool get_lin_bus_fault() { return fault_on_lin_bus_reported_ > LIN_FAULT_REPORT_TICKS; }
+  // micros() of the last frame with a valid checksum, 0 before the first. Every frame starts with a header from
+  // the master, so this shows the master is alive even when it does not address us.
+  uint32_t get_last_valid_frame() const { return this->last_valid_frame_.load(std::memory_order_relaxed); }
 
   void process_lin_msg_queue(TickType_t xTicksToWait);
   void process_log_queue(TickType_t xTicksToWait);
@@ -78,6 +81,8 @@ class LinBusListener : public PollingComponent, public uart::UARTDevice {
   SpscRing<DiagFrame, 64> diag_frames_;
   // LIN messages dropped because the LIN message queue was full. Counted by the UART task, taken by the main loop.
   std::atomic<uint32_t> lin_msg_dropped_{0};
+  // Written by the UART task, read by the main loop.
+  std::atomic<uint32_t> last_valid_frame_{0};
 
  private:
   uint32_t diag_pid_us_ = 0;
