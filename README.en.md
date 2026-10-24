@@ -183,7 +183,7 @@ The example configuration drives this LED with two signals:
 - Shows whether the ESP is communicating at all, before WiFi or HA is available
 - Useful during initial setup and on-site troubleshooting
 
-**Note on the 90-second timeout:** The `CP_PLUS_CONNECTED` sensor reports `false` only 90 seconds after the last received LIN packet. If the CP Plus is physically disconnected, the LED therefore stays green for up to 90 seconds — this is the intended behaviour of the LIN bus protocol, designed to tolerate brief connection interruptions.
+**Note on the 60-second timeout:** The `CP_PLUS_CONNECTED` sensor reports `false` only 60 seconds after the last valid LIN frame on the bus. The CP Plus runs a burst about every 15 seconds even with the panel asleep, so the sensor stays on at rest. If the CP Plus is physically disconnected, the LED therefore stays green for up to 60 seconds, which tolerates brief connection interruptions.
 
 The implementation uses two ESPHome globals (`led_color`, `led_ticks`) and a 100 ms interval as LED driver, so that other intervals (alive indication) and switch actions (TX commands) can control the LED simply by setting these variables.
 
