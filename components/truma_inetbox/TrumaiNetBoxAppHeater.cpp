@@ -10,6 +10,9 @@ namespace truma_inetbox {
 static const char *const TAG = "truma_inetbox.TrumaiNetBoxAppHeater";
 // The CP Plus offers Boost only above this gap between target and room.
 static constexpr float BOOST_MIN_GAP = 10;
+// Raw current temperatures (room, water) of a status sent right after the C3 wakes up, before it has read the
+// heater: 31.1/50.0 °C after a wake-up from the panel, 0.0/0.0 °C after a user wake-up.
+static constexpr uint16_t WAKE_UP_TEMPS[][2] = {{0x0BE1, 0x0C9E}, {0x0AAA, 0x0AAA}};
 
 StatusFrameHeaterResponse *TrumaiNetBoxAppHeater::update_prepare() {
   // An update is currently going on.
@@ -57,6 +60,19 @@ void TrumaiNetBoxAppHeater::reset() {
   TrumaStausFrameResponseStorage<StatusFrameHeater, StatusFrameHeaterResponse>::reset();
   std::lock_guard<std::mutex> guard(this->lock_);
   this->uploaded_valid_ = false;
+}
+
+void TrumaiNetBoxAppHeater::set_status(StatusFrameHeater val) {
+  for (const auto &temps : WAKE_UP_TEMPS) {
+    if (val.current_temp_room == temps[0] && val.current_temp_water == temps[1]) {
+      ESP_LOGD(TAG, "Wake-up current temperatures, keeping the last ones");
+      std::lock_guard<std::mutex> guard(this->lock_);
+      val.current_temp_room = this->incoming_.current_temp_room;
+      val.current_temp_water = this->incoming_.current_temp_water;
+      break;
+    }
+  }
+  TrumaStausFrameResponseStorage<StatusFrameHeater, StatusFrameHeaterResponse>::set_status(val);
 }
 
 void TrumaiNetBoxAppHeater::on_upload_accepted(uint8_t command_counter) {

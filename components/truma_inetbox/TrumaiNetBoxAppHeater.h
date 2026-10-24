@@ -13,6 +13,8 @@ class TrumaiNetBoxAppHeater : public TrumaStausFrameResponseStorage<StatusFrameH
   void dump_data() const override;
   bool can_update() override;
   void reset() override;
+  // LIN event task.
+  void set_status(StatusFrameHeater val) override;
 
   // LIN event task: the CP Plus acknowledged the upload `command_counter` with OKAY. If it was the last heater
   // upload, the accepted values reach the main loop like a downloaded status, so the climates show them at once:
