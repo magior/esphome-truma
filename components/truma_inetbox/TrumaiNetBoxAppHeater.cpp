@@ -18,6 +18,8 @@ static constexpr uint16_t WAKE_UP_ROOM = 0x0BE1;
 static constexpr uint16_t WAKE_UP_WATER = 0x0C9E;
 // Seen 0.6-7.2 s after the PID 0x16 wake-up values.
 static constexpr uint32_t WAKE_UP_WINDOW_MS = 10 * 1000;
+// The CP Plus offers Boost only above this gap between target and room.
+static constexpr float BOOST_MIN_GAP = 10;
 
 StatusFrameHeaterResponse *TrumaiNetBoxAppHeater::update_prepare() {
   // An update is currently going on.
@@ -156,6 +158,17 @@ bool TrumaiNetBoxAppHeater::action_heater_room(uint8_t temperature, HeatingMode 
   if (!this->can_update()) {
     ESP_LOGW(TAG, "Cannot update Truma.");
     return false;
+  }
+  if (mode == HeatingMode::HEATING_MODE_BOOST && this->data_.heating_mode != HeatingMode::HEATING_MODE_BOOST &&
+      this->parent_->get_heater_device() != TRUMA_DEVICE::HEATER_VARIO) {
+    // NAN while the room temperature is unknown, which keeps Boost off.
+    float room = temp_code_to_decimal(this->data_.current_temp_room);
+    if (!(temperature - room > BOOST_MIN_GAP)) {
+      ESP_LOGW(TAG, "Boost needs a target more than %.0f °C above the room (%.1f °C), not sent.", BOOST_MIN_GAP,
+               room);
+      this->state_callback_.call(&this->data_);
+      return false;
+    }
   }
   auto heater = this->update_prepare();
 
