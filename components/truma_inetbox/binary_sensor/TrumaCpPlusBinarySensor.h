@@ -14,8 +14,8 @@ class TrumaCpPlusBinarySensor : public PollingComponent,
   void dump_config() override;
 
  protected:
-  // Last request timestamp that already timed out; stays "disconnected" until a newer one arrives.
-  uint32_t timed_out_request_{0};
+  // Last frame timestamp that already timed out; stays "disconnected" until a newer one arrives.
+  uint32_t timed_out_frame_{0};
 };
 }  // namespace truma_inetbox
 }  // namespace esphome
