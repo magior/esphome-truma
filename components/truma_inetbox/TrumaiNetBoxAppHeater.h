@@ -17,6 +17,11 @@ class TrumaiNetBoxAppHeater : public TrumaStausFrameResponseStorage<StatusFrameH
   // LIN event task.
   void set_status(StatusFrameHeater val) override;
 
+  // LIN event task: the CP Plus acknowledged the upload `command_counter` with OKAY. If it was the last heater
+  // upload, the accepted values reach the main loop like a downloaded status, so the climates show them at once:
+  // the C3 sends no status (14 33) after a target change, only when the heater state or a temperature changes.
+  void on_upload_accepted(uint8_t command_counter);
+
   // Heating mode for the fan-mode select: Vario Heat modes only on a Vario Heat heater (H3, TRUMA_DEVICE
   // HEATER_VARIO); every Combi uses ECO/HIGH. The Combi 6 Gas heater H5.00.00 reports 0x05, which
   // TRUMA_DEVICE also names CPPLUS_VARIO.
@@ -40,6 +45,10 @@ class TrumaiNetBoxAppHeater : public TrumaStausFrameResponseStorage<StatusFrameH
  protected:
   // LIN event task only: the last status kept the previous current temperatures.
   bool wake_up_values_skipped_{false};
+  // Guarded by `lock_`: the last heater upload, its command counter and whether it still awaits its ack.
+  StatusFrameHeaterResponse uploaded_{};
+  uint8_t uploaded_counter_{0};
+  bool uploaded_valid_{false};
 };
 
 }  // namespace truma_inetbox
