@@ -1,6 +1,7 @@
 #include "TrumaiNetBoxApp.h"
 #include <cinttypes>
 #include "TrumaStatusFrameBuilder.h"
+#include "esphome/core/alloc_helpers.h"
 #include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
 #include "helpers.h"
