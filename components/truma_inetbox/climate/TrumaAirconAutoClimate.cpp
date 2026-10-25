@@ -11,9 +11,16 @@ static constexpr float AIRCON_AUTO_TEMPERATURE_STEP = 1;
 static constexpr float AIRCON_AUTO_CURRENT_TEMPERATURE_STEP = 0.1;
 
 void TrumaAirconAutoClimate::setup() {
+  // Before any target since boot: the default of the iNet app.
+  this->last_target_temperature_ = AIRCON_AUTO_TEMPERATURE_DEFAULT;
+  this->target_temperature = this->last_target_temperature_;
   this->parent_->get_aircon_auto()->add_on_message_callback([this](const StatusFrameAirconAuto *status) {
     // The CP Plus reports the AUTO target while AUTO is on and 0 after switching it off (issue #28 logs).
-    this->target_temperature = temp_code_to_decimal(status->target_temp_aircon_auto);
+    float target = temp_code_to_decimal(status->target_temp_aircon_auto);
+    if (!std::isnan(target)) {
+      this->last_target_temperature_ = target;
+    }
+    this->target_temperature = this->last_target_temperature_;
     this->current_temperature = temp_code_to_decimal(status->current_temp_room);
     this->mode = (status->target_temp_aircon_auto == TargetTemp::TARGET_TEMP_OFF) ? climate::CLIMATE_MODE_OFF
                                                                                    : climate::CLIMATE_MODE_AUTO;
@@ -24,8 +31,8 @@ void TrumaAirconAutoClimate::setup() {
 void TrumaAirconAutoClimate::dump_config() { LOG_CLIMATE(TAG, "Truma Aircon Auto Climate", this); }
 
 void TrumaAirconAutoClimate::control(const climate::ClimateCall &call) {
-  auto status = this->parent_->get_aircon_auto()->get_status();
-  float temp = temp_code_to_decimal(status->target_temp_aircon_auto, AIRCON_AUTO_TEMPERATURE_DEFAULT);
+  // Switch on to the last target shown; a target in this call wins.
+  float temp = this->last_target_temperature_;
 
   if (call.get_target_temperature().has_value()) {
     temp = *call.get_target_temperature();
