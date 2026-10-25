@@ -15,6 +15,11 @@ class TrumaAirconAutoClimate : public Component, public climate::Climate, public
   void dump_config() override;
   void control(const climate::ClimateCall &call) override;
   climate::ClimateTraits traits() override;
+
+ protected:
+  // Last target: shown while off (MQTT would publish "nan", which Home Assistant cannot convert)
+  // and used to switch back on.
+  float last_target_temperature_{NAN};
 };
 
 }  // namespace truma_inetbox
