@@ -53,7 +53,9 @@ climate::ClimateTraits TrumaWaterClimate::traits() {
   traits.set_supported_modes({climate::CLIMATE_MODE_OFF, climate::CLIMATE_MODE_HEAT});
   traits.set_visual_min_temperature(WATER_TEMPERATURE_MIN);
   traits.set_visual_max_temperature(WATER_TEMPERATURE_MAX);
-  traits.set_visual_temperature_step(WATER_TEMPERATURE_STEP);
+  // Home Assistant takes the current step as precision and only accepts 0.1, 0.5 or 1.
+  traits.set_visual_target_temperature_step(WATER_TEMPERATURE_STEP);
+  traits.set_visual_current_temperature_step(1);
   return traits;
 }
 }  // namespace truma_inetbox

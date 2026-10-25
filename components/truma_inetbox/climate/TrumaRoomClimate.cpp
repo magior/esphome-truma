@@ -112,7 +112,9 @@ climate::ClimateTraits TrumaRoomClimate::traits() {
   }});
   traits.set_visual_min_temperature(ROOM_TEMPERATURE_MIN);
   traits.set_visual_max_temperature(ROOM_TEMPERATURE_MAX);
-  traits.set_visual_temperature_step(ROOM_TEMPERATURE_STEP);
+  // Home Assistant takes the current step as precision: the room temperature comes in tenths.
+  traits.set_visual_target_temperature_step(ROOM_TEMPERATURE_STEP);
+  traits.set_visual_current_temperature_step(0.1);
   return traits;
 }
 }  // namespace truma_inetbox
