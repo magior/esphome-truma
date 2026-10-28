@@ -13,11 +13,17 @@ static constexpr float ROOM_TEMPERATURE_STEP = 1;
 static constexpr float ROOM_CURRENT_TEMPERATURE_STEP = 0.1;
 
 void TrumaRoomClimate::setup() {
+  this->last_target_temperature_ = ROOM_SWITCH_ON_TEMPERATURE;
+  this->target_temperature = this->last_target_temperature_;
   this->parent_->get_heater()->add_on_message_callback([this](const StatusFrameHeater *status_heater) {
     // Publish updated state
-    this->target_temperature = temp_code_to_decimal(status_heater->target_temp_room);
+    float target = temp_code_to_decimal(status_heater->target_temp_room);
+    if (!std::isnan(target)) {
+      this->last_target_temperature_ = target;
+    }
+    this->target_temperature = this->last_target_temperature_;
     this->current_temperature = temp_code_to_decimal(status_heater->current_temp_room);
-    this->mode = std::isnan(this->target_temperature) ? climate::CLIMATE_MODE_OFF : climate::CLIMATE_MODE_HEAT;
+    this->mode = std::isnan(target) ? climate::CLIMATE_MODE_OFF : climate::CLIMATE_MODE_HEAT;
 
     switch (status_heater->heating_mode) {
       case HeatingMode::HEATING_MODE_ECO:

@@ -14,9 +14,15 @@ static constexpr float WATER_TEMPERATURE_STEP = 20;
 static constexpr float WATER_CURRENT_TEMPERATURE_STEP = 1;
 
 void TrumaWaterClimate::setup() {
+  this->last_target_temperature_ = WATER_SWITCH_ON_TEMPERATURE;
+  this->target_temperature = this->last_target_temperature_;
   this->parent_->get_heater()->add_on_message_callback([this](const StatusFrameHeater *status_heater) {
     // Publish updated state
-    this->target_temperature = water_temp_200_fix(temp_code_to_decimal(status_heater->target_temp_water));
+    float target = water_temp_200_fix(temp_code_to_decimal(status_heater->target_temp_water));
+    if (!std::isnan(target)) {
+      this->last_target_temperature_ = target;
+    }
+    this->target_temperature = this->last_target_temperature_;
     this->current_temperature = temp_code_to_decimal(status_heater->current_temp_water);
     this->mode = (status_heater->target_temp_water == TargetTemp::TARGET_TEMP_OFF) ? climate::CLIMATE_MODE_OFF
                                                                                    : climate::CLIMATE_MODE_HEAT;
