@@ -14,6 +14,10 @@ class TrumaRoomClimate : public Component, public climate::Climate, public Paren
   void control(const climate::ClimateCall &call) override;
 
   climate::ClimateTraits traits() override;
+
+ protected:
+  // Target shown while off: MQTT would publish "nan", which Home Assistant cannot convert.
+  float last_target_temperature_{NAN};
 };
 }  // namespace truma_inetbox
 }  // namespace esphome
